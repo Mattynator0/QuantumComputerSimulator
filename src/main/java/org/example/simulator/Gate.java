@@ -1,16 +1,17 @@
 package org.example.simulator;
 
 import ch.obermuhlner.math.big.BigDecimalMath;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.example.math.Complex;
 import org.example.math.ComplexMatrix;
 
 import java.math.BigDecimal;
 
-import static java.lang.Math.*;
 import static org.example.math.BigDecimalMathHelper.MC;
 
 @Getter
+@EqualsAndHashCode
 public final class Gate {
 
     private final String name;
@@ -68,49 +69,45 @@ public final class Gate {
                 "Phase",
                 new ComplexMatrix(new Complex[][]{
                         {Complex.ONE, Complex.ZERO},
-                        {Complex.ZERO, new Complex(cos(theta), sin(theta))},
+                        {Complex.ZERO, Complex.cis(BigDecimal.valueOf(theta))},
                 }),
                 theta
         );
     }
 
     public static Gate RX(double theta) {
-        BigDecimal c = BigDecimalMath.cos(BigDecimal.valueOf(theta / 2), MC);
-        BigDecimal s = BigDecimalMath.sin(BigDecimal.valueOf(theta / 2), MC);
+        BigDecimal half = BigDecimal.valueOf(-theta / 2);
 
         return new Gate(
                 "RX",
                 new ComplexMatrix(new Complex[][]{
-                        {new Complex(c, BigDecimal.ZERO), new Complex(BigDecimal.ZERO, s.negate())},
-                        {new Complex(BigDecimal.ZERO, s.negate()), new Complex(c, BigDecimal.ZERO)}
+                        {new Complex(BigDecimalMath.cos(half, MC), BigDecimal.ZERO), new Complex(BigDecimal.ZERO, BigDecimalMath.sin(half, MC))},
+                        {new Complex(BigDecimal.ZERO, BigDecimalMath.sin(half, MC)), new Complex(BigDecimalMath.cos(half, MC), BigDecimal.ZERO)}
                 }),
                 theta
         );
     }
 
     public static Gate RY(double theta) {
-        BigDecimal c = BigDecimalMath.cos(BigDecimal.valueOf(theta / 2), MC);
-        BigDecimal s = BigDecimalMath.sin(BigDecimal.valueOf(theta / 2), MC);
+        BigDecimal half = BigDecimal.valueOf(theta / 2);
 
         return new Gate(
-                "RX",
+                "RY",
                 new ComplexMatrix(new Complex[][]{
-                        {new Complex(c), new Complex(s.negate())},
-                        {new Complex(s), new Complex(c)}
+                        {new Complex(BigDecimalMath.cos(half, MC)), new Complex(BigDecimalMath.sin(half, MC).negate())},
+                        {new Complex(BigDecimalMath.sin(half, MC)), new Complex(BigDecimalMath.cos(half, MC))}
                 }),
                 theta
         );
     }
 
     public static Gate RZ(double theta) {
-        BigDecimal c = BigDecimalMath.cos(BigDecimal.valueOf(theta / 2), MC);
-        BigDecimal s = BigDecimalMath.sin(BigDecimal.valueOf(theta / 2), MC);
 
         return new Gate(
                 "RZ",
                 new ComplexMatrix(new Complex[][]{
-                        {new Complex(c, s.negate()), Complex.ZERO},
-                        {Complex.ZERO, new Complex(c, s)}
+                        {Complex.cis(BigDecimal.valueOf(-theta / 2)), Complex.ZERO},
+                        {Complex.ZERO, Complex.cis(BigDecimal.valueOf(theta / 2))}
                 }),
                 theta
         );
