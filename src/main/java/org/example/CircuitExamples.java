@@ -50,4 +50,18 @@ public class CircuitExamples {
         // estimate the eigenvalue (phase by which eigenstate is rotated)
         return QuantumAlgorithms.qpe(statePrep, estimationQubitCount, eigenCircuit, false);
     }
+
+    public static QuantumCircuit amplitudeEstimation(int estimationQubitCount, int targetQubitCount, int[] goodStates) {
+
+        // Amplitude estimation gives the combined probability of measuring a good state on circuit A.
+        // It works by applying the grover operator G in place of a uniform transformation in QPE.
+        // The measured result `v` can be converted into probability using p = sin²(PI * v / N),
+
+        // initial state we want to measure
+        QuantumCircuit A = new QuantumCircuit(targetQubitCount);
+        A.uniform();
+
+        // combined good states probability estimation
+        return QuantumAlgorithms.amplitudeEstimation(A, goodStates, estimationQubitCount, targetQubitCount, false);
+    }
 }
