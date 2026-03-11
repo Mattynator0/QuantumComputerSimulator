@@ -1,4 +1,4 @@
-package org.example;
+package org.example.simulator;
 
 import ch.obermuhlner.math.big.BigDecimalMath;
 import lombok.Getter;

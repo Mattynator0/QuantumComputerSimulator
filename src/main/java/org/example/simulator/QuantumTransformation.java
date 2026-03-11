@@ -1,4 +1,4 @@
-package org.example;
+package org.example.simulator;
 
 import lombok.Getter;
 
