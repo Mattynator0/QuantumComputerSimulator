@@ -1,5 +1,7 @@
 package org.example.math;
 
+import java.util.Arrays;
+
 public final class ComplexMatrix {
 
     private final int rows;
@@ -32,10 +34,19 @@ public final class ComplexMatrix {
         Complex[][] adjoint = new Complex[rows][cols];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
-                adjoint[i][j] = get(j, i).conjugate();
+                adjoint[i][j] = this.get(j, i).conjugate();
             }
         }
 
         return new ComplexMatrix(adjoint);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        ComplexMatrix other = (ComplexMatrix) o;
+        return rows == other.rows && cols == other.cols && Arrays.deepEquals(data, other.data);
     }
 }
