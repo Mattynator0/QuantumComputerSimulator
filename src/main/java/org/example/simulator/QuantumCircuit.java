@@ -1,6 +1,5 @@
 package org.example.simulator;
 
-import ch.obermuhlner.math.big.BigDecimalMath;
 import lombok.Getter;
 import lombok.val;
 import org.example.math.Complex;
@@ -12,6 +11,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.example.math.BigDecimalMathHelper.*;
+import static org.example.math.MathUtils.isBitSet;
+import static org.example.math.MathUtils.reverseArray;
 
 public class QuantumCircuit {
 
@@ -27,13 +28,16 @@ public class QuantumCircuit {
     private final List<QuantumTransformation> transformations = new ArrayList<>();
 
     public QuantumCircuit(final int qubitCount) {
-        assert qubitCount > 0;
+
+        if (qubitCount <= 0)
+            throw new IllegalArgumentException("Qubit count must be > 0");
+
         this.qubitCount = qubitCount;
         this.prepareIdentityState();
     }
 
     private void prepareIdentityState() {
-        int size = (int) Math.pow(2, qubitCount);
+        int size = 1 << qubitCount;
         this.state = new Complex[size];
 
         state[0] = Complex.ONE;
@@ -42,7 +46,7 @@ public class QuantumCircuit {
         }
     }
 
-    private void appendNewQubits(int n) {
+    void appendNewQubits(int n) {
         qubitCount += n;
         Complex[] stateCopy = this.state.clone();
 
@@ -69,6 +73,18 @@ public class QuantumCircuit {
         }
     }
 
+    public void generateRandomState() {
+        // FIXME phases are symmetric around |2^(n-1)> state which is not very random
+
+        for (int i = 0; i < qubitCount; i++) {
+            double theta = random.nextDouble() * Math.PI;
+            double phi = random.nextDouble() * 2 * Math.PI;
+
+            this.ry(theta, i);
+            this.rz(phi, i);
+        }
+    }
+
     public void geometric(double theta) {
         for (int i = 0; i < qubitCount; i++) {
             this.h(i);
@@ -83,12 +99,13 @@ public class QuantumCircuit {
         }
     }
 
+    // normal distribution approximation
     public void raisedCosine() {
         int lastQubit = this.qubitCount - 1;
 
         this.h(lastQubit);
         this.phase(Math.PI * -1, lastQubit);
-        this.qft(true, false);
+        this.qft(false);
     }
 
     public void binomialApprox() {
@@ -102,7 +119,7 @@ public class QuantumCircuit {
         for (int i = 1; i < qubitCount - 1; i++)
             this.cx(0, i);
 
-        this.qft(true, false);
+        this.qft(false);
     }
 
     @Override
@@ -161,41 +178,26 @@ public class QuantumCircuit {
         }
     }
 
-    public void grover(QuantumCircuit phaseOracle, int iterations) {
-
-        assert iterations >= 0;
-        assert qubitCount == phaseOracle.qubitCount;
-
-        QuantumCircuit A = this.clone();
-
-        for (int i = 0; i < iterations; i++) {
-            this.append(phaseOracle, 0);
-            this.append(A.inverse(), 0);
-            this.invert_0_state();
-            this.append(A, 0);
-        }
+    public void qft(boolean swap) {
+        _qft(false, IntStream.range(0, qubitCount).toArray(), swap);
     }
 
-    public void qft(boolean reversed, boolean swap) {
-        _qft(false, IntStream.range(0, qubitCount).toArray(), reversed, swap);
+    public void qft(int[] targets, boolean swap) {
+        _qft(false, targets, swap);
     }
 
-    public void qft(int[] targets, boolean reversed, boolean swap) {
-        _qft(false, targets, reversed, swap);
+    public void iqft(boolean swap) {
+        _qft(true, IntStream.range(0, qubitCount).toArray(), swap);
     }
 
-    public void iqft(boolean reversed, boolean swap) {
-        _qft(true, IntStream.range(0, qubitCount).toArray(), reversed, swap);
+    public void iqft(int[] targets, boolean swap) {
+        _qft(true, targets, swap);
     }
 
-    public void iqft(int[] targets, boolean reversed, boolean swap) {
-        _qft(true, targets, reversed, swap);
-    }
-
-    private void _qft(boolean inverse, int[] targets, boolean reversed, boolean swap) {
+    private void _qft(boolean inverse, int[] targets, boolean swap) {
         int factor = inverse ? -1 : 1;
 
-        if (reversed) {
+        if (!swap) {
             reverseArray(targets);
         }
 
@@ -207,53 +209,8 @@ public class QuantumCircuit {
             }
         }
 
-        // TODO figure out if 'swap' variable is needed or if 'NOT reversed' is equivalent for all use cases
         if (swap)
             this.mswap(targets);
-    }
-
-    public static QuantumCircuit qpe(QuantumCircuit eigenState,
-                                     int estimationQubitCount,
-                                     QuantumCircuit eigenCircuit,
-                                     boolean swap) {
-
-        QuantumCircuit qc = new QuantumCircuit(estimationQubitCount + eigenState.qubitCount);
-        qc.append(eigenState, estimationQubitCount);
-
-        for (int i = 0; i < estimationQubitCount; i++) {
-            qc.h(i);
-        }
-
-        for (int i = 0; i < estimationQubitCount; i++) {
-            for (int j = 0; j < (1 << i); j++) {
-                if (swap)
-                    qc.cAppend(i, eigenCircuit, estimationQubitCount);
-                else
-                    qc.cAppend(estimationQubitCount - i - 1, eigenCircuit, estimationQubitCount);
-            }
-        }
-
-        qc.append(eigenState.inverse(), estimationQubitCount);
-        qc.iqft(IntStream.range(0, estimationQubitCount).toArray(), !swap, swap);
-        return qc;
-    }
-
-    public static QuantumCircuit amplitudeEstimation(QuantumCircuit initialState,
-                                                     int estimationQubitCount,
-                                                     QuantumCircuit phaseOracle,
-                                                     int nGoodResults,
-                                                     boolean swap) {
-
-        QuantumCircuit groverCircuit = new QuantumCircuit(initialState.qubitCount);
-        groverCircuit.append(initialState, 0);
-        groverCircuit.grover(phaseOracle, getOptimalGroverIterations(groverCircuit.qubitCount, nGoodResults));
-
-        return qpe(initialState, estimationQubitCount, groverCircuit, swap);
-    }
-
-    public static int getOptimalGroverIterations(int nQubits, int nGoodResults) {
-        double N = 1 << nQubits;
-        return (int) Math.floor(Math.PI / 4 * Math.sqrt(N / nGoodResults));
     }
 
     public int[] measure(int samples) {
@@ -261,7 +218,7 @@ public class QuantumCircuit {
                 .map(Complex::absSquared)
                 .toList();
 
-        int[] measurements = new int[(int) Math.pow(2, qubitCount)];
+        int[] measurements = new int[1 << qubitCount];
         for (int i = 0; i < samples; i++) {
             double rng = random.nextDouble();
             double total = 0.0;
@@ -276,7 +233,11 @@ public class QuantumCircuit {
         return measurements;
     }
 
-    public void printProbabilities(int[] targets) {
+    public double[] getProbabilities() {
+        return getProbabilities(IntStream.range(0, qubitCount).toArray());
+    }
+
+    public double[] getProbabilities(int[] targets) {
         int numTargets = targets.length;
         int numOutcomes = 1 << numTargets;
         double[] probs = new double[numOutcomes];
@@ -303,10 +264,17 @@ public class QuantumCircuit {
             probs[outcome] += p;
         }
 
+        return probs;
+    }
+
+    public void printProbabilities(int[] targets) {
+
+        double[] probs = getProbabilities(targets);
+
         for (int i = 0; i < probs.length; i++) {
             probs[i] = zeroIfTiny(BigDecimal.valueOf(probs[i]))
                     .stripTrailingZeros()
-                    .round(printMC)
+                    .round(PRINT_MC)
                     .doubleValue();
 
             System.out.print(i + ": " + probs[i] + "\n");
@@ -338,15 +306,13 @@ public class QuantumCircuit {
             if (c.im.equals(BigDecimal.ZERO) && c.re.equals(BigDecimal.ZERO))
                 dto.direction = "0.0";
             else {
-                dto.direction = zeroIfTiny(BigDecimalMath.atan2(c.im, c.re, MC)
-                        .multiply(BigDecimal.valueOf(180)
-                                .divide(BigDecimalMath.pi(MC), MC.getPrecision(), MC.getRoundingMode()))
+                dto.direction = zeroIfTiny(c.direction()
                         .stripTrailingZeros()
-                        .round(printMC))
+                        .round(PRINT_MC))
                         .toString();
             }
-            dto.magnitude = zeroIfTiny(c.abs().stripTrailingZeros().round(printMC)).toString();
-            dto.probability = zeroIfTiny(c.re.multiply(c.re, MC).add(c.im.multiply(c.im, MC), MC).stripTrailingZeros().round(printMC)).toString();
+            dto.magnitude = zeroIfTiny(c.abs().stripTrailingZeros().round(PRINT_MC)).toString();
+            dto.probability = zeroIfTiny(c.absSquared().stripTrailingZeros().round(PRINT_MC)).toString();
 
             detailsList.add(dto);
         }
@@ -381,7 +347,8 @@ public class QuantumCircuit {
         }
     }
 
-    private void invert_0_state() {
+    public void zeroReflection() {
+
         for (int i = 0; i < qubitCount; i++) {
             this.x(i);
         }
@@ -395,77 +362,46 @@ public class QuantumCircuit {
 
     private void transform(Gate gate, int target) {
 
-        int distance = (int) Math.pow(2, target);
-        int prefix_count = (int) Math.pow(2, qubitCount - target - 1);
+        int targetMask = 1 << target;
 
-        for (int i = 0; i < distance; i++) {
-            for (int j = 0; j < prefix_count; j++) {
+        for (int i = 0; i < (1 << qubitCount) - 1; i++) {
+            if ((i & targetMask) != 0)
+                continue;
 
-                applyGate(i, j, distance, gate.getMatrix());
-            }
+            applyGate(i, i | targetMask, gate.getMatrix());
         }
     }
 
     private void cTransform(Gate gate, int control, int target) {
 
-        int distance = (int) Math.pow(2, target);
-        int prefix_count = (int) Math.pow(2, qubitCount - target - 1);
-
-        for (int i = 0; i < distance; i++) {
-            for (int j = 0; j < prefix_count; j++) {
-                if (!isBitSet(j * distance * 2 + i, control))
-                    continue;
-
-                applyGate(i, j, distance, gate.getMatrix());
-            }
-        }
+        mcTransform(gate, List.of(control), target);
     }
 
     private void mcTransform(Gate gate, List<Integer> controls, int target) {
 
-        int distance = (int) Math.pow(2, target);
-        int prefix_count = (int) Math.pow(2, qubitCount - target - 1);
+        int targetMask = 1 << target;
+        int controlMask = 0;
+        for (int control : controls) {
+            controlMask |= (1 << control);
+        }
 
-        for (int i = 0; i < distance; i++) {
-            for (int j = 0; j < prefix_count; j++) {
+        for (int i = 0; i < (1 << qubitCount) - 1; i++) {
+            if ((i & targetMask) != 0)
+                continue;
 
-                int qubitIndex = i;
-                if (!controls.stream().allMatch(control -> isBitSet(qubitIndex, control))) {
-                    continue;
-                }
+            if ((i & controlMask) != controlMask)
+                continue;
 
-                applyGate(i, j, distance, gate.getMatrix());
-            }
+            applyGate(i, i | targetMask, gate.getMatrix());
         }
     }
 
-    private void applyGate(int i, int j, int distance, ComplexMatrix gateMatrix) {
-        int k0 = j * distance * 2 + i;
-        int k1 = k0 + distance;
-
+    private void applyGate(int k0, int k1, ComplexMatrix gateMatrix) {
         Complex x = state[k0];
         Complex y = state[k1];
 
         state[k0] = x.multiply(gateMatrix.get(0, 0)).add(y.multiply(gateMatrix.get(0, 1)));
         state[k1] = x.multiply(gateMatrix.get(1, 0)).add(y.multiply(gateMatrix.get(1, 1)));
-    }
-
-    private boolean isBitSet(int num, int n) {
-        return (num & (1 << n)) != 0;
-    }
-
-    private void reverseArray(int[] arr) {
-        int left = 0;
-        int right = arr.length - 1;
-
-        while (left < right) {
-            int temp = arr[left];
-            arr[left] = arr[right];
-            arr[right] = temp;
-
-            left++;
-            right--;
-        }
     }
 
     public void add(QuantumTransformation quantumTransformation) {
@@ -477,8 +413,10 @@ public class QuantumCircuit {
     }
 
     public void append(QuantumCircuit other, int shift) {
-        assert this.qubitCount == other.qubitCount;
-        assert shift >= 0;
+        if (other.qubitCount + shift > this.qubitCount)
+            throw new IllegalArgumentException("Appended quantum circuit doesn't fit on this circuit.\nthis.qubitCount = "
+                    + this.qubitCount + ", other.qubitCount = "
+                    + other.qubitCount + ", shift = " + shift);
 
         List<QuantumTransformation> otherTransformations = new ArrayList<>(other.clone().transformations);
         otherTransformations.forEach(t -> t.shiftQubits(shift));
@@ -487,8 +425,10 @@ public class QuantumCircuit {
     }
 
     public void cAppend(int control, QuantumCircuit other, int shift) {
-        assert this.qubitCount >= other.qubitCount;
-        assert shift >= 0;
+        if (other.qubitCount + shift > this.qubitCount)
+            throw new IllegalArgumentException("Appended quantum circuit doesn't fit on this circuit.\nthis.qubitCount = "
+                    + this.qubitCount + ", other.qubitCount = "
+                    + other.qubitCount + ", shift = " + shift);
 
         List<QuantumTransformation> otherTransformations = new ArrayList<>(other.clone().transformations);
         otherTransformations.forEach(t -> {
