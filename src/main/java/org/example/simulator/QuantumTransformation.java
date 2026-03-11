@@ -42,11 +42,12 @@ public class QuantumTransformation {
 
     public void shiftQubits(int shift) {
         target += shift;
-        controls.forEach(c -> c += shift);
+
+        controls.replaceAll(c -> c + shift);
     }
 
     public QuantumTransformation inverse() {
-        return new QuantumTransformation(gate.inverse(), controls, target, -arg);
+        return new QuantumTransformation(gate.inverse(), new ArrayList<>(controls), target, -arg);
     }
 
     @Override
