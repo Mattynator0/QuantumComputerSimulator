@@ -54,10 +54,14 @@ public final class QuantumAlgorithms {
     }
 
     public static QuantumCircuit amplitudeEstimation(QuantumCircuit statePrep,
+                                                     int[] goodStates,
                                                      int estimationQubitCount,
-                                                     QuantumCircuit phaseOracle,
+                                                     int targetQubitCount,
                                                      boolean swap) {
         // FIXME result is 1-p instead of p (p - probability of good states)
+
+        QuantumCircuit phaseOracle = new QuantumCircuit(targetQubitCount);
+        phaseOracle.phaseOracle(goodStates);
 
         QuantumCircuit groverCircuit = QuantumAlgorithms.grover(statePrep, phaseOracle, 1);
 

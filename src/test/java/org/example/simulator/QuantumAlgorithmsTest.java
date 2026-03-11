@@ -107,6 +107,7 @@ public class QuantumAlgorithmsTest {
 
         int estimationCount = 3;
         int targetCount = 1;
+        int[] goodResults = new int[]{1};
 
         double a = 0.25;
         double theta = 2 * Math.asin(Math.sqrt(a)); // pi / 3
@@ -114,10 +115,7 @@ public class QuantumAlgorithmsTest {
         QuantumCircuit statePrep = new QuantumCircuit(targetCount);
         statePrep.ry(theta, 0);
 
-        QuantumCircuit phaseOracle = new QuantumCircuit(targetCount);
-        phaseOracle.phaseOracle(new int[]{1});
-
-        QuantumCircuit qc = QuantumAlgorithms.amplitudeEstimation(statePrep, estimationCount, phaseOracle, false);
+        QuantumCircuit qc = QuantumAlgorithms.amplitudeEstimation(statePrep, goodResults, estimationCount, targetCount, false);
         qc.run();
 
         double[] probs = qc.getProbabilities(IntStream.range(0, estimationCount).toArray());
