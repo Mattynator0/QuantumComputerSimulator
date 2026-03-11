@@ -63,10 +63,27 @@ public final class Complex {
 
     @Override
     public String toString() {
-        return zeroIfTiny(re.round(printMC)) + (im.doubleValue() >= 0 ? " + " : " - ") + zeroIfTiny(im.abs().round(printMC)) + "i";
+        return zeroIfTiny(re.round(PRINT_MC)) + (im.doubleValue() >= 0 ? " + " : " - ") + zeroIfTiny(im.abs().round(PRINT_MC)) + "i";
     }
 
     public static Complex cis(BigDecimal theta) {
         return new Complex(BigDecimalMath.cos(theta, MC), BigDecimalMath.sin(theta, MC));
+    }
+
+    public BigDecimal direction() {
+        if (im.equals(BigDecimal.ZERO) && re.equals(BigDecimal.ZERO))
+            return BigDecimal.ZERO;
+
+        return BigDecimalMath.atan2(im, re, MC)
+                .multiply(BigDecimal.valueOf(180)
+                        .divide(BigDecimalMath.pi(MC), MC.getPrecision(), MC.getRoundingMode()));
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof Complex other) {
+            return this.re.equals(other.re) && this.im.equals(other.im);
+        }
+        return false;
     }
 }
