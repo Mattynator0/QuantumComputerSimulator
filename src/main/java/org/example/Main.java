@@ -1,26 +1,27 @@
 package org.example;
 
-import java.util.stream.IntStream;
+import org.example.simulator.QuantumCircuit;
+import org.example.utils.BinaryPolynomial;
+
+import java.util.List;
 
 public class Main {
 
     public static void main(String[] args) {
 
-        int estimationCount = 5;
-        int targetCount = 3;
-        int[] items = new int[]{0, 1, 2};
+        int keyQubitCount = 2;
+        int valueQubitCount = 4;
 
-        QuantumCircuit initialState = new QuantumCircuit(targetCount);
-        initialState.uniform();
+        // p(k) = k^2 - 4
+        BinaryPolynomial polynomial = new BinaryPolynomial();
+        polynomial.add(4, List.of(1));
+        polynomial.add(4, List.of(1, 0));
+        polynomial.add(1, List.of(0));
+        polynomial.add(-4, List.of());
 
-        QuantumCircuit phaseOracle = new QuantumCircuit(targetCount);
-        phaseOracle.phaseOracle(items);
-
-        QuantumCircuit qc = QuantumCircuit.amplitudeEstimation(initialState, estimationCount, phaseOracle, items.length, false);
+        QuantumCircuit qc = CircuitExamples.findZerosOfPolynomial(keyQubitCount, valueQubitCount, polynomial);
 
         qc.run();
-        qc.printProbabilities(IntStream.range(0, estimationCount).toArray());
-//        qc.printStateDetailed();
-//        System.out.println(qc.getTransformations().size());
+        qc.printStateDetailed();
     }
 }

@@ -12,19 +12,11 @@ import static org.example.simulator.TestUtils.assertCloseTo;
 
 public class QuantumAlgorithmsTest {
 
-    int qubitCount;
-    int N;
-    QuantumCircuit qc;
-
-    @BeforeEach
-    void setUp() {
-        qubitCount = 3;
-        N = 1 << qubitCount;
-        qc = new QuantumCircuit(qubitCount);
-    }
-
     @Test
     public void grover_oneResult() {
+        int qubitCount = 3;
+        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+
         QuantumCircuit initialState = new QuantumCircuit(qubitCount);
         initialState.uniform();
 
@@ -50,6 +42,9 @@ public class QuantumAlgorithmsTest {
 
     @Test
     public void grover_manyResults() {
+        int qubitCount = 3;
+        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+
         QuantumCircuit initialState = new QuantumCircuit(qubitCount);
         initialState.uniform();
 
@@ -62,7 +57,6 @@ public class QuantumAlgorithmsTest {
         qc.uniform();
         qc.append(QuantumAlgorithms.grover(initialState, oracle, iterations), 0);
         qc.run();
-        qc.printStateDetailed();
 
         double[] probs = qc.getProbabilities();
         for (int i = 0; i < 1 << qubitCount; i++) {
@@ -103,7 +97,7 @@ public class QuantumAlgorithmsTest {
     }
 
     @Test
-    public void amplitudeEstimation() {
+    public void amplitudeEstimation_simple() {
 
         int estimationCount = 3;
         int targetCount = 1;
@@ -119,8 +113,26 @@ public class QuantumAlgorithmsTest {
         qc.run();
 
         double[] probs = qc.getProbabilities(IntStream.range(0, estimationCount).toArray());
-        // FIXME result is 1-p instead of p
+
         assertCloseTo(0.353, probs[3]);
         assertCloseTo(0.353, probs[5]);
+    }
+
+    @Test
+    void amplitudeEstimation_textbookExample() {
+        int estimationCount = 5;
+        int targetCount = 3;
+        int[] items = new int[]{0, 1, 2};
+
+        QuantumCircuit A = new QuantumCircuit(targetCount);
+        A.uniform();
+
+        QuantumCircuit circuit = QuantumAlgorithms.amplitudeEstimation(A, items, estimationCount, targetCount, false);
+
+        circuit.run();
+        double[] probs = circuit.getProbabilities(IntStream.range(0, estimationCount).toArray());
+
+        assertCloseTo(0.379, probs[9]);
+        assertCloseTo(0.379, probs[23]);
     }
 }

@@ -32,6 +32,9 @@ public class QuantumCircuit {
         if (qubitCount <= 0)
             throw new IllegalArgumentException("Qubit count must be > 0");
 
+        if (qubitCount > 15)
+            throw new IllegalArgumentException("Circuit is too big, qubit count is " + qubitCount);
+
         this.qubitCount = qubitCount;
         this.prepareIdentityState();
     }
@@ -211,6 +214,24 @@ public class QuantumCircuit {
 
         if (swap)
             this.mswap(targets);
+    }
+
+    public void encodeTerms(double coeff, int[] vars, int keyQubitCount, int valueQubitCount) {
+
+        if (qubitCount < keyQubitCount + valueQubitCount)
+            throw new IllegalArgumentException("Circuit is too small for the key and value registers");
+
+        for (int i = 0; i < valueQubitCount; i++) {
+            double theta = Math.PI * coeff / (1 << i);
+            if (vars.length > 1) {
+                this.mcp(theta, Arrays.stream(vars).map(x -> x + valueQubitCount).toArray(), i);
+            } else if (vars.length == 1) {
+                this.cp(theta, vars[0] + valueQubitCount, i);
+            }
+            else {
+                this.phase(theta, i);
+            }
+        }
     }
 
     public int[] measure(int samples) {

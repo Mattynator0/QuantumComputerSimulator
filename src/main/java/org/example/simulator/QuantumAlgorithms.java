@@ -1,5 +1,8 @@
 package org.example.simulator;
 
+import org.example.utils.BinaryPolynomial;
+
+import java.util.List;
 import java.util.stream.IntStream;
 
 public final class QuantumAlgorithms {
@@ -58,7 +61,6 @@ public final class QuantumAlgorithms {
                                                      int estimationQubitCount,
                                                      int targetQubitCount,
                                                      boolean swap) {
-        // FIXME result is 1-p instead of p (p - probability of good states)
 
         QuantumCircuit phaseOracle = new QuantumCircuit(targetQubitCount);
         phaseOracle.phaseOracle(goodStates);
@@ -66,5 +68,21 @@ public final class QuantumAlgorithms {
         QuantumCircuit groverCircuit = QuantumAlgorithms.grover(statePrep, phaseOracle, 1);
 
         return qpe(statePrep, estimationQubitCount, groverCircuit, swap);
+    }
+
+    public static QuantumCircuit buildPolynomialCircuit(int keyQubitCount,
+                                                        int valueQubitCount,
+                                                        BinaryPolynomial polynomial) {
+
+        QuantumCircuit qc = new QuantumCircuit(keyQubitCount + valueQubitCount);
+        qc.uniform();
+
+        for (int i = 0; i < polynomial.getNumberOfTerms(); i++) {
+            qc.encodeTerms(polynomial.getCoefficient(i), polynomial.getQubits(i), keyQubitCount, valueQubitCount);
+        }
+
+        qc.iqft(IntStream.range(0, valueQubitCount).toArray(), false);
+
+        return qc;
     }
 }
