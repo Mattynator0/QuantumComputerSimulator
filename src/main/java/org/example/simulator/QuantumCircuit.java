@@ -24,6 +24,8 @@ public class QuantumCircuit {
 
     private final Random random = new Random();
 
+    private static final int MAX_QUBITS = 20;
+
     @Getter
     private final List<QuantumTransformation> transformations = new ArrayList<>();
 
@@ -32,7 +34,7 @@ public class QuantumCircuit {
         if (qubitCount <= 0)
             throw new IllegalArgumentException("Qubit count must be > 0");
 
-        if (qubitCount > 15)
+        if (qubitCount > MAX_QUBITS)
             throw new IllegalArgumentException("Circuit is too big, qubit count is " + qubitCount);
 
         this.qubitCount = qubitCount;
@@ -50,6 +52,10 @@ public class QuantumCircuit {
     }
 
     void appendNewQubits(int n) {
+
+        if (qubitCount + n > MAX_QUBITS)
+            throw new IllegalArgumentException("Resulting circuit is too big; qubit count becomes " + (qubitCount + n) + ", max is " + MAX_QUBITS);
+
         qubitCount += n;
         Complex[] stateCopy = this.state.clone();
 
@@ -327,11 +333,11 @@ public class QuantumCircuit {
     public void printStateDetailed() {
         String[] columnNames = {"Outcome", "Binary", "Amplitude", "Direction", "Magnitude", "Probability"};
 
-        List<StateDetailsDTO> detailsList = new ArrayList<>();
+        List<CircuitStateDetailsDTO> detailsList = new ArrayList<>();
 
         for (int i = 0; i < this.state.length; i++) {
             Complex c = this.state[i];
-            StateDetailsDTO dto = new StateDetailsDTO();
+            CircuitStateDetailsDTO dto = new CircuitStateDetailsDTO();
 
             dto.outcome = String.valueOf(i);
             dto.binary = String.format(

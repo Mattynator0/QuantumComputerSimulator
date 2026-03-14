@@ -3,7 +3,7 @@ package org.example.simulator;
 import lombok.Data;
 
 @Data
-public class StateDetailsDTO {
+public class CircuitStateDetailsDTO {
 
     public String outcome;
     public String binary;
