@@ -5,6 +5,8 @@ import org.example.utils.BinaryPolynomial;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import static org.example.math.MathUtils.*;
+
 public final class QuantumAlgorithms {
 
     private QuantumAlgorithms() {
@@ -84,5 +86,55 @@ public final class QuantumAlgorithms {
         qc.iqft(IntStream.range(0, valueQubitCount).toArray(), false);
 
         return qc;
+    }
+
+    public static OptimizerState groverOptimizer(int inputQubitCount,
+                                                 double[] polynomialTerms,
+                                                 QuantumCircuit phaseOracle,
+                                                 int[] schedule,
+                                                 int maxFails) {
+
+        BinaryPolynomial polynomial = BinaryPolynomial.toBinaryPolynomial(inputQubitCount, polynomialTerms);
+
+        OptimizerState optimizerState = new OptimizerState();
+        optimizerState.bestValue = 0;
+        optimizerState.threshold = 1; // this assumes a positive solution to the polynomial
+
+        int valueQubitCount = phaseOracle.getQubitCount();
+        int valueMask = getMask(0, valueQubitCount);
+        int keyMask = getMask(valueQubitCount, inputQubitCount + valueQubitCount);
+
+        QuantumCircuit statePrep = null;
+
+        do {
+            if (optimizerState.threshold > 0) {
+                polynomial.add(-optimizerState.threshold, List.of()); // TODO make this method add the coefficient for qubits combination
+                statePrep = buildPolynomialCircuit(inputQubitCount, valueQubitCount, polynomial);
+            }
+
+            QuantumCircuit qc = statePrep.clone();
+
+            int groverIterations = schedule[optimizerState.iteration % schedule.length];
+            qc.append(grover(statePrep, phaseOracle, groverIterations), 0);
+            optimizerState.iteration++;
+
+            qc.run();
+            int result = qc.measureOnce();
+            int key = (result & keyMask) >> valueQubitCount;
+            int measuredValue = twosComplementToNegative(result & valueMask, valueQubitCount);
+            int trueValue = (int) calculatePolynomial(key, polynomialTerms);
+
+            if (trueValue > optimizerState.bestValue) {
+                optimizerState.threshold = measuredValue + 1;
+                optimizerState.bestValue = trueValue;
+                optimizerState.bestCandidate = key;
+            } else {
+                optimizerState.threshold = 0;
+                optimizerState.fails++;
+            }
+
+        } while (optimizerState.fails < maxFails);
+
+        return optimizerState;
     }
 }

@@ -254,6 +254,22 @@ public class QuantumCircuit {
         return measurements;
     }
 
+    public int measureOnce() {
+        List<BigDecimal> probabilities = Arrays.stream(state)
+                .map(Complex::absSquared)
+                .toList();
+
+        double rng = random.nextDouble();
+        double total = 0.0;
+        for (int i = 0; i < probabilities.size(); i++) {
+            total += probabilities.get(i).doubleValue();
+            if (total > rng) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     public double[] getProbabilities() {
         return getProbabilities(IntStream.range(0, qubitCount).toArray());
     }

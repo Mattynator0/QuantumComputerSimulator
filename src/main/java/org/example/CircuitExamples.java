@@ -1,5 +1,6 @@
 package org.example;
 
+import org.example.simulator.OptimizerState;
 import org.example.simulator.QuantumAlgorithms;
 import org.example.simulator.QuantumCircuit;
 import org.example.utils.BinaryPolynomial;
@@ -96,5 +97,23 @@ public class CircuitExamples {
         QuantumCircuit qc = statePrep.clone();
         qc.append(grover, 0);
         return qc;
+    }
+
+    public static int findMaxOfPolynomial(int keyQubitCount,
+                                           int valueQubitCount,
+                                           double[] polynomialTerms) {
+        // build a phase oracle
+        QuantumCircuit oracle = new QuantumCircuit(valueQubitCount);
+
+        // tag states where value >= 0
+        oracle.x(valueQubitCount - 1);
+        oracle.mcp(Math.PI, IntStream.range(0, valueQubitCount - 1).toArray(), valueQubitCount - 1);
+        oracle.x(valueQubitCount - 1);
+
+        // grover optimizer searches iteratively for larger values of the polynomial
+        // it applies the grover operator n times, where n is chosen according to the provided schedule (here [0, 1])
+        OptimizerState result = QuantumAlgorithms.groverOptimizer(keyQubitCount, polynomialTerms, oracle, new int[]{0, 1}, 7);
+
+        return result.bestCandidate;
     }
 }

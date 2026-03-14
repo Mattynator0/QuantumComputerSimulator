@@ -31,6 +31,33 @@ public class MathUtils {
         }
     }
 
+    public static int getMask(int from, int to) {
+        int mask = 0;
+        for (int i = from; i < to; i++) {
+            mask |= (1 << i);
+        }
+        return mask;
+    }
+
+    public static int twosComplementToNegative(int num, int bits) {
+
+        if ((num & 1 << (bits - 1)) == 0)
+            return num;
+
+        return -1 * ((1 << bits) - num);
+    }
+
+    public static double calculatePolynomial(int x, double[] terms) {
+        double result = 0;
+        for (int i = terms.length - 1; i >= 0; i--) {
+            result += terms[i];
+            if (i == 0)
+                break;
+            result *= x;
+        }
+        return result;
+    }
+
     public static double classicalRaisedCosine(int x, int N) {
         double mu = 1 << N - 1;
         double s = 1 << N - 1;
