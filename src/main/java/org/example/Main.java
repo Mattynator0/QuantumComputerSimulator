@@ -1,5 +1,7 @@
 package org.example;
 
+import org.example.simulator.OptimizerState;
+
 public class Main {
 
     public static void main(String[] args) {
@@ -8,7 +10,7 @@ public class Main {
         int valueQubitCount = 6;
         double[] polynomialTerms = new double[]{-5, 6, -1};
 
-        int result = CircuitExamples.findMaxOfPolynomial(keyQubitCount, valueQubitCount, polynomialTerms);
+        OptimizerState result = CircuitExamples.findMaxOfPolynomial(keyQubitCount, valueQubitCount, polynomialTerms);
         System.out.println(result);
     }
 }

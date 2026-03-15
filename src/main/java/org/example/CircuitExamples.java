@@ -5,6 +5,7 @@ import org.example.simulator.QuantumAlgorithms;
 import org.example.simulator.QuantumCircuit;
 import org.example.utils.BinaryPolynomial;
 
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import static org.example.math.MathUtils.getOptimalGroverIterations;
@@ -99,7 +100,7 @@ public class CircuitExamples {
         return qc;
     }
 
-    public static int findMaxOfPolynomial(int keyQubitCount,
+    public static OptimizerState findMaxOfPolynomial(int keyQubitCount,
                                            int valueQubitCount,
                                            double[] polynomialTerms) {
         // build a phase oracle
@@ -110,10 +111,13 @@ public class CircuitExamples {
         oracle.mcp(Math.PI, IntStream.range(0, valueQubitCount - 1).toArray(), valueQubitCount - 1);
         oracle.x(valueQubitCount - 1);
 
-        // grover optimizer searches iteratively for larger values of the polynomial
-        // it applies the grover operator n times, where n is chosen according to the provided schedule (here [0, 1])
-        OptimizerState result = QuantumAlgorithms.groverOptimizer(keyQubitCount, polynomialTerms, oracle, new int[]{0, 1}, 7);
+        // create the stop condition for grover searching
+        Function<OptimizerState, Boolean> stopCondition = (o -> o.fails < 10);
 
-        return result.bestCandidate;
+        // grover optimizer searches iteratively for larger values of the polynomial
+        // in each iteration it applies the grover operator n times, where n is chosen according to the provided schedule (here [0, 1])
+        int[] schedule = new int[]{0, 1};
+
+        return QuantumAlgorithms.groverOptimizer(keyQubitCount, polynomialTerms, oracle, schedule, stopCondition);
     }
 }

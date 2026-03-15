@@ -3,6 +3,7 @@ package org.example.simulator;
 import org.example.utils.BinaryPolynomial;
 
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import static org.example.math.MathUtils.*;
@@ -92,12 +93,12 @@ public final class QuantumAlgorithms {
                                                  double[] polynomialTerms,
                                                  QuantumCircuit phaseOracle,
                                                  int[] schedule,
-                                                 int maxFails) {
+                                                 Function<OptimizerState, Boolean> stopCondition) {
 
         BinaryPolynomial polynomial = BinaryPolynomial.toBinaryPolynomial(inputQubitCount, polynomialTerms);
 
         OptimizerState optimizerState = new OptimizerState();
-        optimizerState.bestValue = 0;
+        optimizerState.bestValue = -1;
         optimizerState.threshold = 1; // this assumes a positive solution to the polynomial
 
         int valueQubitCount = phaseOracle.getQubitCount();
@@ -108,7 +109,7 @@ public final class QuantumAlgorithms {
 
         do {
             if (optimizerState.threshold > 0) {
-                polynomial.add(-optimizerState.threshold, List.of()); // TODO make this method add the coefficient for qubits combination
+                polynomial.add(-optimizerState.threshold, List.of()); // TODO make this method add the coefficients of identical qubits combinations
                 statePrep = buildPolynomialCircuit(inputQubitCount, valueQubitCount, polynomial);
             }
 
@@ -133,7 +134,7 @@ public final class QuantumAlgorithms {
                 optimizerState.fails++;
             }
 
-        } while (optimizerState.fails < maxFails);
+        } while (stopCondition.apply(optimizerState));
 
         return optimizerState;
     }
