@@ -9,6 +9,7 @@ import org.example.math.ComplexMatrix;
 import java.math.BigDecimal;
 
 import static org.example.math.BigDecimalMathHelper.MC;
+import static org.example.math.MathUtils.INV_SQRT2;
 
 @Getter
 @EqualsAndHashCode
@@ -49,12 +50,11 @@ public final class Gate {
     public static final Gate Z = new Gate(
             "Z",
             new ComplexMatrix(new Complex[][]{
-                    {Complex.ZERO, Complex.ONE},
-                    {Complex.ONE, new Complex(0, -1)}
+                    {Complex.ONE, Complex.ZERO},
+                    {Complex.ZERO, new Complex(-1, 0)}
             })
     );
 
-    private static final BigDecimal INV_SQRT2 = BigDecimal.ONE.divide(BigDecimalMath.sqrt(BigDecimal.valueOf(2), MC), MC.getPrecision(), MC.getRoundingMode());
 
     public static final Gate H = new Gate(
             "H",
@@ -76,13 +76,13 @@ public final class Gate {
     }
 
     public static Gate RX(double theta) {
-        BigDecimal half = BigDecimal.valueOf(-theta / 2);
+        BigDecimal minusHalf = BigDecimal.valueOf(-theta / 2);
 
         return new Gate(
                 "RX",
                 new ComplexMatrix(new Complex[][]{
-                        {new Complex(BigDecimalMath.cos(half, MC), BigDecimal.ZERO), new Complex(BigDecimal.ZERO, BigDecimalMath.sin(half, MC))},
-                        {new Complex(BigDecimal.ZERO, BigDecimalMath.sin(half, MC)), new Complex(BigDecimalMath.cos(half, MC), BigDecimal.ZERO)}
+                        {new Complex(BigDecimalMath.cos(minusHalf, MC), BigDecimal.ZERO), new Complex(BigDecimal.ZERO, BigDecimalMath.sin(minusHalf, MC))},
+                        {new Complex(BigDecimal.ZERO, BigDecimalMath.sin(minusHalf, MC)), new Complex(BigDecimalMath.cos(minusHalf, MC), BigDecimal.ZERO)}
                 }),
                 theta
         );

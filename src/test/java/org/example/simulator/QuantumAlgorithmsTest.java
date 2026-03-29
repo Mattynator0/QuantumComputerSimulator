@@ -21,8 +21,7 @@ public class QuantumAlgorithmsTest {
         initialState.uniform();
 
         int[] goodResults = new int[]{1};
-        QuantumCircuit oracle = new QuantumCircuit(qubitCount);
-        oracle.phaseOracle(goodResults);
+        QuantumCircuit oracle = QuantumAlgorithms.phaseOracle(qubitCount, goodResults);
 
         int iterations = getOptimalGroverIterations(qubitCount, goodResults.length);
 
@@ -49,8 +48,7 @@ public class QuantumAlgorithmsTest {
         initialState.uniform();
 
         int[] goodResults = new int[]{1, 5, 6};
-        QuantumCircuit oracle = new QuantumCircuit(qubitCount);
-        oracle.phaseOracle(goodResults);
+        QuantumCircuit oracle = QuantumAlgorithms.phaseOracle(qubitCount, goodResults);
 
         int iterations = getOptimalGroverIterations(qubitCount, goodResults.length);
 

@@ -4,6 +4,7 @@ import org.example.utils.BinaryPolynomial;
 
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.IntPredicate;
 import java.util.stream.IntStream;
 
 import static org.example.math.MathUtils.*;
@@ -12,6 +13,52 @@ public final class QuantumAlgorithms {
 
     private QuantumAlgorithms() {
         throw new AssertionError("Cannot instantiate utility class");
+    }
+
+    public static QuantumCircuit phaseOracle(int qubitCount, int[] values) {
+
+        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+
+        for (int value : values) {
+            for (int i = 0; i < qubitCount; i++) {
+                if (!isBitSet(value, i)) {
+                    qc.x(i);
+                }
+            }
+
+            qc.mcp(Math.PI, IntStream.range(0, qubitCount - 1).toArray(), qubitCount - 1);
+
+            for (int i = 0; i < qubitCount; i++) {
+                if (!isBitSet(value, i)) {
+                    qc.x(i);
+                }
+            }
+        }
+
+        return qc;
+    }
+
+    public static QuantumCircuit bitOracle(int qubitCount, int[] values) {
+
+        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+
+        for (int value : values) {
+            for (int i = 0; i < qubitCount; i++) {
+                if (!isBitSet(value, i)) {
+                    qc.x(i);
+                }
+            }
+
+            qc.mcx(IntStream.range(0, qubitCount - 1).toArray(), qubitCount - 1);
+
+            for (int i = 0; i < qubitCount; i++) {
+                if (!isBitSet(value, i)) {
+                    qc.x(i);
+                }
+            }
+        }
+
+        return qc;
     }
 
     public static QuantumCircuit grover(QuantumCircuit A, QuantumCircuit phaseOracle, int iterations) {
@@ -65,8 +112,7 @@ public final class QuantumAlgorithms {
                                                      int targetQubitCount,
                                                      boolean swap) {
 
-        QuantumCircuit phaseOracle = new QuantumCircuit(targetQubitCount);
-        phaseOracle.phaseOracle(goodStates);
+        QuantumCircuit phaseOracle = QuantumAlgorithms.phaseOracle(targetQubitCount, goodStates);
 
         QuantumCircuit groverCircuit = QuantumAlgorithms.grover(statePrep, phaseOracle, 1);
 
@@ -137,5 +183,41 @@ public final class QuantumAlgorithms {
         } while (stopCondition.apply(optimizerState));
 
         return optimizerState;
+    }
+
+    /// Gives a state |0> if predicate is constant, or non-zero state if predicate is balanced
+    public static QuantumCircuit deutschJozsa(IntPredicate predicate, int qubitCount) {
+
+        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+        qc.uniform();
+        qc.append(QuantumAlgorithms.phaseOracle(qubitCount, IntStream.range(0, 1 << qubitCount).filter(predicate).toArray()), 0);
+        qc.uniform();
+        return qc;
+    }
+
+    /// g^x = y mod N
+    public static QuantumCircuit discreteLog(int g, int y, int N, int qubitCount) {
+        // FIXME wrong implementation
+
+        QuantumCircuit qc = new QuantumCircuit(qubitCount * 3);
+
+        for (int i = 0; i < qubitCount; i++)
+            qc.x(i);
+
+        for (int i = qubitCount; i < 3 * qubitCount; i++)
+            qc.h(i);
+
+        double theta_g = Math.TAU * g / N;
+        double theta_y = Math.TAU * y / N;
+
+        for (int i = 0; i < qubitCount; i++) {
+            qc.cp(theta_g * (1 << i), i + 2 * qubitCount, i);
+            qc.cp(theta_y * (1 << i), i + qubitCount, i);
+        }
+
+        qc.qft(IntStream.range(qubitCount, 2 * qubitCount).toArray(), true);
+        qc.qft(IntStream.range(2 * qubitCount, 3 * qubitCount).toArray(), true);
+
+        return qc;
     }
 }

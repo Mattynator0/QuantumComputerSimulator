@@ -134,7 +134,7 @@ public class QuantumCircuit {
     @Override
     public QuantumCircuit clone() {
         QuantumCircuit copy = new QuantumCircuit(qubitCount);
-        transformations.forEach(t -> copy.add(t.clone()));
+        transformations.forEach(t -> copy.appendTransformation(t.clone()));
         return copy;
     }
 
@@ -142,49 +142,10 @@ public class QuantumCircuit {
         QuantumCircuit inverted = new QuantumCircuit(qubitCount);
 
         for (int i = this.transformations.size() - 1; i >= 0; i--) {
-            inverted.add(this.transformations.get(i).inverse());
+            inverted.appendTransformation(this.transformations.get(i).inverse());
         }
 
         return inverted;
-    }
-
-    public void phaseOracle(int[] values) {
-        for (int value : values) {
-            for (int i = 0; i < qubitCount; i++) {
-                if (!isBitSet(value, i)) {
-                    this.x(i);
-                }
-            }
-
-            this.mcp(Math.PI, IntStream.range(0, qubitCount - 1).toArray(), qubitCount - 1);
-
-            for (int i = 0; i < qubitCount; i++) {
-                if (!isBitSet(value, i)) {
-                    this.x(i);
-                }
-            }
-        }
-    }
-
-    public void bitOracle(int[] values) {
-
-        this.appendNewQubits(1);
-
-        for (int value : values) {
-            for (int i = 0; i < qubitCount; i++) {
-                if (!isBitSet(value, i)) {
-                    this.x(i);
-                }
-            }
-
-            this.mcx(IntStream.range(0, qubitCount - 1).toArray(), qubitCount - 1);
-
-            for (int i = 0; i < qubitCount; i++) {
-                if (!isBitSet(value, i)) {
-                    this.x(i);
-                }
-            }
-        }
     }
 
     public void qft(boolean swap) {
@@ -447,11 +408,11 @@ public class QuantumCircuit {
         state[k1] = x.multiply(gateMatrix.get(1, 0)).add(y.multiply(gateMatrix.get(1, 1)));
     }
 
-    public void add(QuantumTransformation quantumTransformation) {
+    public void appendTransformation(QuantumTransformation quantumTransformation) {
         transformations.add(quantumTransformation);
     }
 
-    public void addAll(List<QuantumTransformation> quantumTransformations) {
+    public void appendAllTransformations(List<QuantumTransformation> quantumTransformations) {
         transformations.addAll(quantumTransformations);
     }
 
@@ -480,6 +441,33 @@ public class QuantumCircuit {
         });
 
         this.transformations.addAll(otherTransformations);
+    }
+
+    public void add(int x) {
+        // TODO figure out if avoiding swaps is possible
+        this.qft(true);
+
+        double theta = x * Math.TAU / (1 << qubitCount);
+        for (int i = 0; i < qubitCount; i++) {
+            this.phase((1 << i) * theta, i);
+        }
+
+        this.iqft(true);
+    }
+
+    public void multiply(int x) {
+        // appends a new register such that the result is |a>|x*a>
+
+        int resultRegisterCount = (int) Math.ceil(Math.log(x)) + qubitCount;
+        int oldQubitCount = qubitCount;
+        this.appendNewQubits(resultRegisterCount);
+
+        for (int i = 0; i < oldQubitCount; i++) {
+            QuantumCircuit qc = new QuantumCircuit(resultRegisterCount);
+            qc.add(x * (1 << i));
+
+            this.cAppend(i, qc, oldQubitCount);
+        }
     }
 
     public void x(int target) {

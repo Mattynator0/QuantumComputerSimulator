@@ -1,6 +1,14 @@
 package org.example.math;
 
+import ch.obermuhlner.math.big.BigDecimalMath;
+
+import java.math.BigDecimal;
+
+import static org.example.math.BigDecimalMathHelper.MC;
+
 public class MathUtils {
+
+    public static final BigDecimal INV_SQRT2 = BigDecimal.ONE.divide(BigDecimalMath.sqrt(BigDecimal.valueOf(2), MC), MC.getPrecision(), MC.getRoundingMode());
 
     public static boolean isBitSet(int num, int n) {
         return (num & (1 << n)) != 0;

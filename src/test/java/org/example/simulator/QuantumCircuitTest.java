@@ -1,10 +1,14 @@
 package org.example.simulator;
 
+import ch.obermuhlner.math.big.BigDecimalMath;
 import org.example.math.Complex;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.Set;
@@ -135,7 +139,6 @@ public class QuantumCircuitTest {
     void raisedCosine() {
         qc.raisedCosine();
         qc.run();
-        qc.printStateDetailed();
 
         double[] probs = qc.getProbabilities();
 
@@ -201,7 +204,7 @@ public class QuantumCircuitTest {
         qc.uniform();
 
         int[] items = new int[]{0, 3, 5};
-        qc.phaseOracle(items);
+        qc.append(QuantumAlgorithms.phaseOracle(qubitCount, items), 0);
         qc.run();
 
         Complex[] state = qc.getState();
@@ -221,9 +224,10 @@ public class QuantumCircuitTest {
         qc.uniform();
 
         int[] items = new int[]{0, 3, 5};
-        qc.bitOracle(items);
+        qc.appendNewQubits(1);
         qubitCount++;
         N <<= 1;
+        qc.append(QuantumAlgorithms.bitOracle(qubitCount, items), 0);
 
         qc.run();
 
@@ -488,5 +492,199 @@ public class QuantumCircuitTest {
         assertEquals(3, qtThird.getTarget());
     }
 
-    // TODO gate tests (x, h, cx, etc.)
+    @Test
+    public void x() {
+        qc.x(0);
+        qc.run();
+        Complex[] state = qc.getState();
+        for (int i = 0; i < N; i++) {
+            if (i == 1)
+                complexAssertEquals(Complex.ONE, state[i]);
+            else
+                complexAssertEquals(Complex.ZERO, state[i]);
+        }
+    }
+
+    @Test
+    public void y() {
+        qc.h(0);
+        qc.y(0);
+        qc.run();
+        Complex[] state = qc.getState();
+
+        complexAssertEquals(new Complex(BigDecimal.ZERO, INV_SQRT2.negate()), state[0]);
+        complexAssertEquals(new Complex(BigDecimal.ZERO, INV_SQRT2), state[1]);
+        for (int i = 2; i < N; i++) {
+            complexAssertEquals(Complex.ZERO, state[i]);
+        }
+    }
+
+    @Test
+    public void z() {
+        qc.h(0);
+        qc.z(0);
+        qc.run();
+        Complex[] state = qc.getState();
+
+        complexAssertEquals(new Complex(INV_SQRT2), state[0]);
+        complexAssertEquals(new Complex(INV_SQRT2.negate()), state[1]);
+        for (int i = 2; i < N; i++) {
+            complexAssertEquals(Complex.ZERO, state[i]);
+        }
+    }
+
+    @Test
+    public void h() {
+        qc.h(0);
+        qc.run();
+        Complex[] state = qc.getState();
+
+        complexAssertEquals(new Complex(INV_SQRT2), state[0]);
+        complexAssertEquals(new Complex(INV_SQRT2), state[1]);
+        for (int i = 2; i < N; i++) {
+            complexAssertEquals(Complex.ZERO, state[i]);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {1, 2, 3, 4})
+    public void phase(double denominator) {
+
+        double theta = Math.PI / denominator;
+
+        qc.x(0);
+        qc.phase( theta, 0);
+        qc.run();
+        Complex[] state = qc.getState();
+
+        complexAssertEquals(Complex.ZERO, state[0]);
+        complexAssertEquals(Complex.cis(BigDecimal.valueOf(theta)), state[1]);
+        for (int i = 2; i < N; i++) {
+            complexAssertEquals(Complex.ZERO, state[i]);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {1, 2, 3, 4})
+    public void rx_0(double denominator) {
+
+        double theta = Math.PI / denominator;
+
+        qc.rx(theta, 0);
+        qc.run();
+        Complex[] state = qc.getState();
+
+        complexAssertEquals(new Complex(Math.cos(-0.5 * theta)), state[0]);
+        complexAssertEquals(new Complex(0, Math.sin(-0.5 * theta)), state[1]);
+        for (int i = 2; i < N; i++) {
+            complexAssertEquals(Complex.ZERO, state[i]);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {1, 2, 3, 4})
+    public void rx_1(double denominator) {
+
+        double theta = Math.PI / denominator;
+
+        qc.x(0);
+        qc.rx(theta, 0);
+        qc.run();
+        Complex[] state = qc.getState();
+
+        complexAssertEquals(new Complex(0, Math.sin(-0.5 * theta)), state[0]);
+        complexAssertEquals(new Complex(Math.cos(-0.5 * theta)), state[1]);
+        for (int i = 2; i < N; i++) {
+            complexAssertEquals(Complex.ZERO, state[i]);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {1, 2, 3, 4})
+    public void ry_0(double denominator) {
+
+        double theta = Math.PI / denominator;
+
+        qc.ry(theta, 0);
+        qc.run();
+        Complex[] state = qc.getState();
+
+        complexAssertEquals(new Complex(Math.cos(0.5 * theta)), state[0]);
+        complexAssertEquals(new Complex(Math.sin(0.5 * theta)), state[1]);
+        for (int i = 2; i < N; i++) {
+            complexAssertEquals(Complex.ZERO, state[i]);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {1, 2, 3, 4})
+    public void ry_1(double denominator) {
+
+        double theta = Math.PI / denominator;
+
+        qc.x(0);
+        qc.ry(theta, 0);
+        qc.run();
+        Complex[] state = qc.getState();
+
+        complexAssertEquals(new Complex(-Math.sin(0.5 * theta)), state[0]);
+        complexAssertEquals(new Complex(Math.cos(0.5 * theta)), state[1]);
+        for (int i = 2; i < N; i++) {
+            complexAssertEquals(Complex.ZERO, state[i]);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {1, 2, 3, 4})
+    public void rz_0(double denominator) {
+
+        double theta = Math.PI / denominator;
+
+        qc.rz(theta, 0);
+        qc.run();
+        Complex[] state = qc.getState();
+
+        complexAssertEquals(Complex.cis(BigDecimal.valueOf(-theta / 2)), state[0]);
+        complexAssertEquals(Complex.ZERO, state[1]);
+        for (int i = 2; i < N; i++) {
+            complexAssertEquals(Complex.ZERO, state[i]);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {1, 2, 3, 4})
+    public void rz_1(double denominator) {
+
+        double theta = Math.PI / denominator;
+
+        qc.x(0);
+        qc.rz(theta, 0);
+        qc.run();
+        Complex[] state = qc.getState();
+
+        complexAssertEquals(Complex.ZERO, state[0]);
+        complexAssertEquals(Complex.cis(BigDecimal.valueOf(theta / 2)), state[1]);
+        for (int i = 2; i < N; i++) {
+            complexAssertEquals(Complex.ZERO, state[i]);
+        }
+    }
+
+    @Test
+    void swap() {
+
+        double theta = Math.PI / 3;
+        qc.rx(theta, 0);
+        qc.swap(0, 1);
+        qc.run();
+        Complex[] state = qc.getState();
+
+        complexAssertEquals(new Complex(Math.cos(-0.5 * theta)), state[0]);
+        complexAssertEquals(Complex.ZERO, state[1]);
+        complexAssertEquals(new Complex(0, Math.sin(-0.5 * theta)), state[2]);
+        for (int i = 3; i < N; i++) {
+            complexAssertEquals(Complex.ZERO, state[i]);
+        }
+    }
+
+    // TODO controlled, multi-controlled
 }

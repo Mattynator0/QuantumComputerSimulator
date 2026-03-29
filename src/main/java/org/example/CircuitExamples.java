@@ -6,6 +6,7 @@ import org.example.simulator.QuantumCircuit;
 import org.example.utils.BinaryPolynomial;
 
 import java.util.function.Function;
+import java.util.function.IntPredicate;
 import java.util.stream.IntStream;
 
 import static org.example.math.MathUtils.getOptimalGroverIterations;
@@ -19,8 +20,7 @@ public class CircuitExamples {
         initialState.uniform();
 
         // prepare a phase oracle (flip phase of good outcomes)
-        QuantumCircuit oracle = new QuantumCircuit(qubitCount);
-        oracle.phaseOracle(goodResults);
+        QuantumCircuit oracle = QuantumAlgorithms.phaseOracle(qubitCount, goodResults);
 
         // apply the grover operator iteratively until the amplitudes of good outcomes are maximized
         int iterations = getOptimalGroverIterations(qubitCount, goodResults.length);
@@ -119,5 +119,20 @@ public class CircuitExamples {
         int[] schedule = new int[]{0, 1};
 
         return QuantumAlgorithms.groverOptimizer(keyQubitCount, polynomialTerms, oracle, schedule, stopCondition);
+    }
+
+    public static String deutschJozsaAlgorithm(IntPredicate f, int qubitCount) {
+
+        // build the Deutsch-Jozsa circuit
+        // the zero state in the resulting superposition has probability 100% when f is constant or 0% when f is balanced
+        QuantumCircuit qc = QuantumAlgorithms.deutschJozsa(f, qubitCount);
+        qc.run();
+
+        if (qc.measureOnce() == 0) {
+            return "Constant";
+        }
+        else {
+            return "Balanced";
+        }
     }
 }
