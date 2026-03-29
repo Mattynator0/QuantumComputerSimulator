@@ -69,106 +69,119 @@ public final class QuantumAlgorithms {
         QuantumCircuit qc = new QuantumCircuit(A.getQubitCount());
 
         for (int i = 0; i < iterations; i++) {
-            qc.append(phaseOracle, 0);
-            qc.append(A.inverse(), 0);
+            qc.append(phaseOracle);
+            qc.append(A.inverse());
             qc.zeroReflection();
-            qc.append(A, 0);
+            qc.append(A);
         }
 
         return qc;
     }
 
-    public static QuantumCircuit qpe(QuantumCircuit statePrep,
-                                     int estimationQubitCount,
-                                     QuantumCircuit eigenCircuit,
+    public static QuantumCircuit qpe(QuantumRegister estimationReg,
+                                     QuantumRegister targetReg,
+                                     QuantumCircuit statePrep,
+                                     QuantumCircuit unitary,
                                      boolean swap) {
 
+        QuantumCircuit qc = new QuantumCircuit(estimationReg, targetReg);
+
         // 1. Prepare target register
-        QuantumCircuit qc = new QuantumCircuit(estimationQubitCount + statePrep.getQubitCount());
-        qc.append(statePrep, estimationQubitCount);
+        qc.append(statePrep, targetReg);
 
         // 2. Hadamards on estimation register
-        for (int i = 0; i < estimationQubitCount; i++) {
-            qc.h(i);
-        }
+        qc.uniform(estimationReg);
 
         // 3. Controlled powers of the unitary operator
-        for (int i = 0; i < estimationQubitCount; i++) {
+        for (int i = 0; i < estimationReg.getQubitCount(); i++) {
             for (int j = 0; j < (1 << i); j++) {
-                int controlIndex = swap ? i : estimationQubitCount - i - 1;
 
-                qc.cAppend(controlIndex, eigenCircuit, estimationQubitCount);
+                int controlIndex = swap ? i : -i - 1;
+                qc.cAppend(estimationReg.get(controlIndex), unitary, targetReg);
             }
         }
 
         // 4. IQFT
-        qc.iqft(IntStream.range(0, estimationQubitCount).toArray(), swap);
+        qc.iqft(estimationReg.all(), swap);
         return qc;
     }
 
-    public static QuantumCircuit amplitudeEstimation(QuantumCircuit statePrep,
+    public static QuantumCircuit amplitudeEstimation(QuantumRegister estimationReg,
+                                                     QuantumRegister targetReg,
+                                                     QuantumCircuit statePrep,
                                                      int[] goodStates,
-                                                     int estimationQubitCount,
-                                                     int targetQubitCount,
                                                      boolean swap) {
 
-        QuantumCircuit phaseOracle = QuantumAlgorithms.phaseOracle(targetQubitCount, goodStates);
+        QuantumCircuit phaseOracle = QuantumAlgorithms.phaseOracle(targetReg.getQubitCount(), goodStates);
 
         QuantumCircuit groverCircuit = QuantumAlgorithms.grover(statePrep, phaseOracle, 1);
 
-        return qpe(statePrep, estimationQubitCount, groverCircuit, swap);
+        return qpe(estimationReg, targetReg, statePrep, groverCircuit, swap);
     }
 
-    public static QuantumCircuit buildPolynomialCircuit(int keyQubitCount,
-                                                        int valueQubitCount,
+    public static QuantumCircuit buildPolynomialCircuit(QuantumRegister keyReg,
+                                                        QuantumRegister valueReg,
                                                         BinaryPolynomial polynomial) {
 
-        QuantumCircuit qc = new QuantumCircuit(keyQubitCount + valueQubitCount);
+        QuantumCircuit qc = new QuantumCircuit(valueReg, keyReg);
         qc.uniform();
 
         for (int i = 0; i < polynomial.getNumberOfTerms(); i++) {
-            qc.encodeTerms(polynomial.getCoefficient(i), polynomial.getQubits(i), keyQubitCount, valueQubitCount);
+            qc.encodeTerms(polynomial.getCoefficient(i), polynomial.getQubits(i), keyReg, valueReg);
         }
 
-        qc.iqft(IntStream.range(0, valueQubitCount).toArray(), false);
+        qc.iqft(valueReg.all(), false);
 
         return qc;
     }
 
-    public static OptimizerState groverOptimizer(int inputQubitCount,
+    /**
+     * Method of finding a polynomial maximum through running a grover algorithm and adjusting the input polynomial
+     *
+     * @param keyReg key register
+     * @param valueReg value register
+     * @param polynomialTerms terms of the polynomial
+     * @param phaseOracle phase oracle (usually tags all outputs for which value is greater than zero)
+     * @param schedule schedule of the grover operator iterations
+     * @param stopCondition tells the optimizer when to stop (e.g. after some number of fails)
+     * @return Final state of the optimizer.
+     */
+    public static OptimizerState groverOptimizer(QuantumRegister keyReg,
+                                                 QuantumRegister valueReg,
                                                  double[] polynomialTerms,
                                                  QuantumCircuit phaseOracle,
                                                  int[] schedule,
                                                  Function<OptimizerState, Boolean> stopCondition) {
 
-        BinaryPolynomial polynomial = BinaryPolynomial.toBinaryPolynomial(inputQubitCount, polynomialTerms);
+        BinaryPolynomial polynomial = BinaryPolynomial.toBinaryPolynomial(keyReg.getQubitCount(), polynomialTerms);
 
         OptimizerState optimizerState = new OptimizerState();
+        optimizerState.bestCandidate = -1;
         optimizerState.bestValue = -1;
         optimizerState.threshold = 1; // this assumes a positive solution to the polynomial
 
-        int valueQubitCount = phaseOracle.getQubitCount();
-        int valueMask = getMask(0, valueQubitCount);
-        int keyMask = getMask(valueQubitCount, inputQubitCount + valueQubitCount);
+        keyReg.setShift(valueReg.getQubitCount());
+        int valueMask = getMask(valueReg.getFirst(), valueReg.getEnd());
+        int keyMask = getMask(keyReg.getFirst(), keyReg.getEnd());
 
         QuantumCircuit statePrep = null;
 
         do {
             if (optimizerState.threshold > 0) {
-                polynomial.add(-optimizerState.threshold, List.of()); // TODO make this method add the coefficients of identical qubits combinations
-                statePrep = buildPolynomialCircuit(inputQubitCount, valueQubitCount, polynomial);
+                polynomial.add(-optimizerState.threshold, List.of());
+                statePrep = buildPolynomialCircuit(keyReg, valueReg, polynomial);
             }
 
             QuantumCircuit qc = statePrep.clone();
 
             int groverIterations = schedule[optimizerState.iteration % schedule.length];
-            qc.append(grover(statePrep, phaseOracle, groverIterations), 0);
+            qc.append(grover(statePrep, phaseOracle, groverIterations));
             optimizerState.iteration++;
 
             qc.run();
             int result = qc.measureOnce();
-            int key = (result & keyMask) >> valueQubitCount;
-            int measuredValue = twosComplementToNegative(result & valueMask, valueQubitCount);
+            int key = (result & keyMask) >> valueReg.getQubitCount();
+            int measuredValue = twosComplementToNegative(result & valueMask, valueReg.getQubitCount());
             int trueValue = (int) calculatePolynomial(key, polynomialTerms);
 
             if (trueValue > optimizerState.bestValue) {
@@ -190,34 +203,10 @@ public final class QuantumAlgorithms {
 
         QuantumCircuit qc = new QuantumCircuit(qubitCount);
         qc.uniform();
-        qc.append(QuantumAlgorithms.phaseOracle(qubitCount, IntStream.range(0, 1 << qubitCount).filter(predicate).toArray()), 0);
+        qc.append(phaseOracle(qubitCount, arrayFromPredicate(qubitCount, predicate)));
         qc.uniform();
         return qc;
     }
 
-    /// g^x = y mod N
-    public static QuantumCircuit discreteLog(int g, int y, int N, int qubitCount) {
-        // FIXME wrong implementation
-
-        QuantumCircuit qc = new QuantumCircuit(qubitCount * 3);
-
-        for (int i = 0; i < qubitCount; i++)
-            qc.x(i);
-
-        for (int i = qubitCount; i < 3 * qubitCount; i++)
-            qc.h(i);
-
-        double theta_g = Math.TAU * g / N;
-        double theta_y = Math.TAU * y / N;
-
-        for (int i = 0; i < qubitCount; i++) {
-            qc.cp(theta_g * (1 << i), i + 2 * qubitCount, i);
-            qc.cp(theta_y * (1 << i), i + qubitCount, i);
-        }
-
-        qc.qft(IntStream.range(qubitCount, 2 * qubitCount).toArray(), true);
-        qc.qft(IntStream.range(2 * qubitCount, 3 * qubitCount).toArray(), true);
-
-        return qc;
-    }
+    // TODO discrete log
 }

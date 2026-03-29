@@ -11,7 +11,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.example.math.BigDecimalMathHelper.*;
-import static org.example.math.MathUtils.isBitSet;
 import static org.example.math.MathUtils.reverseArray;
 
 public class QuantumCircuit {
@@ -24,7 +23,7 @@ public class QuantumCircuit {
 
     private final Random random = new Random();
 
-    private static final int MAX_QUBITS = 20;
+    public static final int MAX_QUBITS = 20;
 
     @Getter
     private final List<QuantumTransformation> transformations = new ArrayList<>();
@@ -38,7 +37,23 @@ public class QuantumCircuit {
             throw new IllegalArgumentException("Circuit is too big, qubit count is " + qubitCount);
 
         this.qubitCount = qubitCount;
-        this.prepareIdentityState();
+    }
+
+    public QuantumCircuit(QuantumRegister... registers) {
+
+        int qubitsBefore = 0;
+        for (QuantumRegister register : registers) {
+            register.setShift(qubitsBefore);
+            qubitsBefore += register.getQubitCount();
+        }
+
+        if (qubitsBefore <= 0)
+            throw new IllegalArgumentException("Qubit count must be > 0");
+
+        if (qubitsBefore > MAX_QUBITS)
+            throw new IllegalArgumentException("Circuit is too big, qubit count is " + qubitCount + ", must be <= " + MAX_QUBITS);
+
+        this.qubitCount = qubitsBefore;
     }
 
     private void prepareIdentityState() {
@@ -51,19 +66,20 @@ public class QuantumCircuit {
         }
     }
 
+    /**
+     * @apiNote  Calling this after `run()` will lead to errors.
+     */
     void appendNewQubits(int n) {
 
         if (qubitCount + n > MAX_QUBITS)
             throw new IllegalArgumentException("Resulting circuit is too big; qubit count becomes " + (qubitCount + n) + ", max is " + MAX_QUBITS);
 
         qubitCount += n;
-        Complex[] stateCopy = this.state.clone();
-
-        prepareIdentityState();
-        System.arraycopy(stateCopy, 0, this.state, 0, stateCopy.length);
     }
 
     public void run() {
+        this.prepareIdentityState();
+
         transformations.forEach(tr -> {
             List<Integer> controls = tr.getControls();
             if (controls.isEmpty())
@@ -80,6 +96,10 @@ public class QuantumCircuit {
         for (int i = 0; i < this.qubitCount; i++) {
             this.h(i);
         }
+    }
+
+    public void uniform(QuantumRegister reg) {
+        reg.allAsStream().forEach(this::h);
     }
 
     public void generateRandomState() {
@@ -183,25 +203,26 @@ public class QuantumCircuit {
             this.mswap(targets);
     }
 
-    public void encodeTerms(double coeff, int[] vars, int keyQubitCount, int valueQubitCount) {
+    public void encodeTerms(double coeff, int[] vars, QuantumRegister keyReg, QuantumRegister valueReg) {
 
-        if (qubitCount < keyQubitCount + valueQubitCount)
+        if (qubitCount < keyReg.getQubitCount() + valueReg.getQubitCount())
             throw new IllegalArgumentException("Circuit is too small for the key and value registers");
 
-        for (int i = 0; i < valueQubitCount; i++) {
+        for (int i : valueReg.all()) {
             double theta = Math.PI * coeff / (1 << i);
+
             if (vars.length > 1) {
-                this.mcp(theta, Arrays.stream(vars).map(x -> x + valueQubitCount).toArray(), i);
+                this.mcp(theta, Arrays.stream(vars).map(keyReg::get).toArray(), i);
             } else if (vars.length == 1) {
-                this.cp(theta, vars[0] + valueQubitCount, i);
-            }
-            else {
+                this.cp(theta, keyReg.get(vars[0]), i);
+            } else {
                 this.phase(theta, i);
             }
         }
     }
 
     public int[] measure(int samples) {
+        // TODO make an overload with a QuantumRegister as input
         List<BigDecimal> probabilities = Arrays.stream(state)
                 .map(Complex::absSquared)
                 .toList();
@@ -222,6 +243,7 @@ public class QuantumCircuit {
     }
 
     public int measureOnce() {
+        // TODO make an overload with a QuantumRegister as input
         List<BigDecimal> probabilities = Arrays.stream(state)
                 .map(Complex::absSquared)
                 .toList();
@@ -416,6 +438,14 @@ public class QuantumCircuit {
         transformations.addAll(quantumTransformations);
     }
 
+    public void append(QuantumCircuit other) {
+        append(other, 0);
+    }
+
+    public void append(QuantumCircuit other, QuantumRegister reg) {
+        append(other, reg.getShift());
+    }
+
     public void append(QuantumCircuit other, int shift) {
         if (other.qubitCount + shift > this.qubitCount)
             throw new IllegalArgumentException("Appended quantum circuit doesn't fit on this circuit.\nthis.qubitCount = "
@@ -426,6 +456,10 @@ public class QuantumCircuit {
         otherTransformations.forEach(t -> t.shiftQubits(shift));
 
         this.transformations.addAll(otherTransformations);
+    }
+
+    public void cAppend(int control, QuantumCircuit other, QuantumRegister reg) {
+        cAppend(control, other, reg.getShift());
     }
 
     public void cAppend(int control, QuantumCircuit other, int shift) {
@@ -453,21 +487,6 @@ public class QuantumCircuit {
         }
 
         this.iqft(true);
-    }
-
-    public void multiply(int x) {
-        // appends a new register such that the result is |a>|x*a>
-
-        int resultRegisterCount = (int) Math.ceil(Math.log(x)) + qubitCount;
-        int oldQubitCount = qubitCount;
-        this.appendNewQubits(resultRegisterCount);
-
-        for (int i = 0; i < oldQubitCount; i++) {
-            QuantumCircuit qc = new QuantumCircuit(resultRegisterCount);
-            qc.add(x * (1 << i));
-
-            this.cAppend(i, qc, oldQubitCount);
-        }
     }
 
     public void x(int target) {

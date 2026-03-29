@@ -10,6 +10,12 @@ public class BinaryPolynomial {
     List<BinaryPolynomialTerm> terms = new ArrayList<>();
 
     public void add(double coefficient, List<Integer> qubits) {
+        for (var term : terms) {
+            if (term.qubits.equals(qubits)) { // this doesn't compare the elements
+                term.coefficient += coefficient;
+                return;
+            }
+        }
         terms.add(new BinaryPolynomialTerm(coefficient, qubits));
     }
 
@@ -18,7 +24,7 @@ public class BinaryPolynomial {
     }
 
     public int[] getQubits(int i) {
-        return terms.get(i).qubits;
+        return terms.get(i).qubits.stream().mapToInt(x -> x).toArray();
     }
 
     public int getNumberOfTerms() {
@@ -124,11 +130,11 @@ public class BinaryPolynomial {
     private static class BinaryPolynomialTerm {
 
         public double coefficient;
-        public int[] qubits;
+        public List<Integer> qubits;
 
         public BinaryPolynomialTerm(double coefficient, List<Integer> qubits) {
             this.coefficient = coefficient;
-            this.qubits = qubits.stream().mapToInt(x -> x).toArray();
+            this.qubits = qubits;
         }
     }
 }

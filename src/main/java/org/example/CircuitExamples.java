@@ -3,6 +3,7 @@ package org.example;
 import org.example.simulator.OptimizerState;
 import org.example.simulator.QuantumAlgorithms;
 import org.example.simulator.QuantumCircuit;
+import org.example.simulator.QuantumRegister;
 import org.example.utils.BinaryPolynomial;
 
 import java.util.function.Function;
@@ -12,6 +13,9 @@ import java.util.stream.IntStream;
 import static org.example.math.MathUtils.getOptimalGroverIterations;
 
 public class CircuitExamples {
+
+    // FIXME circuit examples shouldn't require so many arguments
+    // FIXME a potential user can just copy the contents to main() and adjust them by themself
 
     public static QuantumCircuit grover(int qubitCount, int[] goodResults) {
 
@@ -52,8 +56,11 @@ public class CircuitExamples {
         double v = 4.7;
         eigenCircuit.ry(v * Math.TAU / 4, 0);
 
+        QuantumRegister estimationReg = new QuantumRegister(estimationQubitCount);
+        QuantumRegister targetReg = new QuantumRegister(statePrep.getQubitCount());
+
         // estimate the eigenvalue (phase by which eigenstate is rotated)
-        return QuantumAlgorithms.qpe(statePrep, estimationQubitCount, eigenCircuit, false);
+        return QuantumAlgorithms.qpe(estimationReg, targetReg, statePrep, eigenCircuit, false);
     }
 
     public static QuantumCircuit amplitudeEstimation(int estimationQubitCount, int targetQubitCount, int[] goodStates) {
@@ -66,8 +73,11 @@ public class CircuitExamples {
         QuantumCircuit A = new QuantumCircuit(targetQubitCount);
         A.uniform();
 
-        // combined good states probability estimation
-        return QuantumAlgorithms.amplitudeEstimation(A, goodStates, estimationQubitCount, targetQubitCount, false);
+        QuantumRegister estimationReg = new QuantumRegister(estimationQubitCount);
+        QuantumRegister targetReg = new QuantumRegister(targetQubitCount);
+
+        // combined good states' probability estimation
+        return QuantumAlgorithms.amplitudeEstimation(estimationReg, targetReg, A, goodStates, false);
     }
 
     public static QuantumCircuit findZerosOfPolynomial(int keyQubitCount,
@@ -77,8 +87,11 @@ public class CircuitExamples {
         // This method encodes a polynomial as key-value pairs into the key and value registers,
         // after which it tags zeros of the polynomial and applies the grover operator to amplify these states.
 
+        QuantumRegister keyReg = new QuantumRegister(keyQubitCount);
+        QuantumRegister valueReg = new QuantumRegister(valueQubitCount);
+
         // encode the polynomial
-        QuantumCircuit statePrep = QuantumAlgorithms.buildPolynomialCircuit(keyQubitCount, valueQubitCount, polynomial);
+        QuantumCircuit statePrep = QuantumAlgorithms.buildPolynomialCircuit(keyReg, valueReg, polynomial);
 
         // build a phase oracle
         QuantumCircuit oracle = new QuantumCircuit(valueQubitCount);
@@ -101,15 +114,18 @@ public class CircuitExamples {
     }
 
     public static OptimizerState findMaxOfPolynomial(int keyQubitCount,
-                                           int valueQubitCount,
-                                           double[] polynomialTerms) {
+                                                     int valueQubitCount,
+                                                     double[] polynomialTerms) {
+
         // build a phase oracle
-        QuantumCircuit oracle = new QuantumCircuit(valueQubitCount);
+        QuantumRegister oracleReg = new QuantumRegister(valueQubitCount);
+        QuantumCircuit oracle = new QuantumCircuit(oracleReg);
 
         // tag states where value >= 0
-        oracle.x(valueQubitCount - 1);
-        oracle.mcp(Math.PI, IntStream.range(0, valueQubitCount - 1).toArray(), valueQubitCount - 1);
-        oracle.x(valueQubitCount - 1);
+        int last = oracleReg.getLast();
+        oracle.x(last);
+        oracle.mcp(Math.PI, oracleReg.range(0, last), last);
+        oracle.x(last);
 
         // create the stop condition for grover searching
         Function<OptimizerState, Boolean> stopCondition = (o -> o.fails < 10);
@@ -118,7 +134,10 @@ public class CircuitExamples {
         // in each iteration it applies the grover operator n times, where n is chosen according to the provided schedule (here [0, 1])
         int[] schedule = new int[]{0, 1};
 
-        return QuantumAlgorithms.groverOptimizer(keyQubitCount, polynomialTerms, oracle, schedule, stopCondition);
+        QuantumRegister keyReg = new QuantumRegister(keyQubitCount);
+        QuantumRegister valueReg = new QuantumRegister(valueQubitCount);
+
+        return QuantumAlgorithms.groverOptimizer(keyReg, valueReg, polynomialTerms, oracle, schedule, stopCondition);
     }
 
     public static String deutschJozsaAlgorithm(IntPredicate f, int qubitCount) {
@@ -130,8 +149,7 @@ public class CircuitExamples {
 
         if (qc.measureOnce() == 0) {
             return "Constant";
-        }
-        else {
+        } else {
             return "Balanced";
         }
     }

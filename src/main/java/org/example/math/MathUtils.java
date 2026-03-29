@@ -3,12 +3,15 @@ package org.example.math;
 import ch.obermuhlner.math.big.BigDecimalMath;
 
 import java.math.BigDecimal;
+import java.util.function.IntPredicate;
+import java.util.stream.IntStream;
 
 import static org.example.math.BigDecimalMathHelper.MC;
 
 public class MathUtils {
 
-    public static final BigDecimal INV_SQRT2 = BigDecimal.ONE.divide(BigDecimalMath.sqrt(BigDecimal.valueOf(2), MC), MC.getPrecision(), MC.getRoundingMode());
+    public static final BigDecimal INV_SQRT2 =
+            BigDecimal.ONE.divide(BigDecimalMath.sqrt(BigDecimal.valueOf(2), MC), MC.getPrecision(), MC.getRoundingMode());
 
     public static boolean isBitSet(int num, int n) {
         return (num & (1 << n)) != 0;
@@ -39,9 +42,13 @@ public class MathUtils {
         }
     }
 
-    public static int getMask(int from, int to) {
+    public static int[] arrayFromPredicate(int bits, IntPredicate predicate) {
+        return IntStream.range(0, 1 << bits).filter(predicate).toArray();
+    }
+
+    public static int getMask(int start, int end) {
         int mask = 0;
-        for (int i = from; i < to; i++) {
+        for (int i = start; i < end; i++) {
             mask |= (1 << i);
         }
         return mask;

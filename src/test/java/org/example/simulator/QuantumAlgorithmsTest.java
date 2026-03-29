@@ -1,10 +1,10 @@
 package org.example.simulator;
 
-import org.example.CircuitExamples;
-import org.junit.jupiter.api.BeforeEach;
+import org.example.math.Complex;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.Random;
 import java.util.stream.IntStream;
 
 import static org.example.math.MathUtils.getOptimalGroverIterations;
@@ -12,10 +12,80 @@ import static org.example.simulator.TestUtils.assertCloseTo;
 
 public class QuantumAlgorithmsTest {
 
+    int qubitCount;
+    int N;
+    QuantumCircuit qc;
+
+    Random rand = new Random();
+
+    private void setUp(int qubitCount) {
+        this.qubitCount = qubitCount;
+        N = 1 << qubitCount;
+        qc = new QuantumCircuit(qubitCount);
+    }
+
+    private void setUp(QuantumRegister... registers) {
+        qubitCount = Arrays.stream(registers).mapToInt(QuantumRegister::getQubitCount).sum();
+        N = 1 << qubitCount;
+        qc = new QuantumCircuit(registers);
+    }
+
+    @Test
+    void phaseOracle() {
+        setUp(3);
+
+        qc.uniform();
+
+        int[] items = new int[]{0, 3, 5};
+        qc.append(QuantumAlgorithms.phaseOracle(qubitCount, items), 0);
+        qc.run();
+
+        Complex[] state = qc.getState();
+        for (int i = 0; i < N; i++) {
+            int finalI = i;
+            double phase = state[i].direction().doubleValue();
+
+            if (Arrays.stream(items).anyMatch(x -> x == finalI))
+                assertCloseTo(180, phase);
+            else
+                assertCloseTo(0, phase);
+        }
+    }
+
+    @Test
+    void bitOracle() {
+        setUp(3);
+
+        qc.uniform();
+
+        int[] items = new int[]{0, 3, 5};
+        qc.appendNewQubits(1);
+        qubitCount++;
+        N <<= 1;
+        qc.append(QuantumAlgorithms.bitOracle(qubitCount, items), 0);
+
+        qc.run();
+
+        double[] probs = qc.getProbabilities();
+        int halfN = N >> 1;
+        double expectedUniform = 1. / halfN;
+
+        for (int i = 0; i < halfN; i++) {
+            int finalI = i;
+
+            if (Arrays.stream(items).anyMatch(x -> x == finalI)) {
+                assertCloseTo(0, probs[i]);
+                assertCloseTo(expectedUniform, probs[i + halfN]);
+            } else {
+                assertCloseTo(expectedUniform, probs[i]);
+                assertCloseTo(0, probs[i + halfN]);
+            }
+        }
+    }
+
     @Test
     public void grover_oneResult() {
-        int qubitCount = 3;
-        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+        setUp(3);
 
         QuantumCircuit initialState = new QuantumCircuit(qubitCount);
         initialState.uniform();
@@ -30,7 +100,7 @@ public class QuantumAlgorithmsTest {
         qc.run();
 
         double[] probs = qc.getProbabilities();
-        for (int i = 0; i < 1 << qubitCount; i++) {
+        for (int i = 0; i < N; i++) {
             int finalI = i;
             if (Arrays.stream(goodResults).anyMatch(x -> x == finalI))
                 assertCloseTo(0.95, probs[i], 0.05);
@@ -41,8 +111,7 @@ public class QuantumAlgorithmsTest {
 
     @Test
     public void grover_manyResults() {
-        int qubitCount = 3;
-        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+        setUp(3);
 
         QuantumCircuit initialState = new QuantumCircuit(qubitCount);
         initialState.uniform();
@@ -81,7 +150,10 @@ public class QuantumAlgorithmsTest {
         QuantumCircuit unitary = new QuantumCircuit(targetQubits);
         unitary.rz(theta, 0);
 
-        QuantumCircuit qc = QuantumAlgorithms.qpe(statePrep, estimationQubits, unitary, false);
+        QuantumRegister estimationReg = new QuantumRegister(estimationQubits);
+        QuantumRegister targetReg = new QuantumRegister(targetQubits);
+
+        QuantumCircuit qc = QuantumAlgorithms.qpe(estimationReg, targetReg, statePrep, unitary, false);
         qc.run();
 
         double[] probs = qc.getProbabilities(IntStream.range(0, estimationQubits).toArray());
@@ -107,7 +179,10 @@ public class QuantumAlgorithmsTest {
         QuantumCircuit statePrep = new QuantumCircuit(targetCount);
         statePrep.ry(theta, 0);
 
-        QuantumCircuit qc = QuantumAlgorithms.amplitudeEstimation(statePrep, goodResults, estimationCount, targetCount, false);
+        QuantumRegister estimationReg = new QuantumRegister(estimationCount);
+        QuantumRegister targetReg = new QuantumRegister(targetCount);
+
+        QuantumCircuit qc = QuantumAlgorithms.amplitudeEstimation(estimationReg, targetReg, statePrep, goodResults, false);
         qc.run();
 
         double[] probs = qc.getProbabilities(IntStream.range(0, estimationCount).toArray());
@@ -125,10 +200,13 @@ public class QuantumAlgorithmsTest {
         QuantumCircuit A = new QuantumCircuit(targetCount);
         A.uniform();
 
-        QuantumCircuit circuit = QuantumAlgorithms.amplitudeEstimation(A, items, estimationCount, targetCount, false);
+        QuantumRegister estimationReg = new QuantumRegister(estimationCount);
+        QuantumRegister targetReg = new QuantumRegister(targetCount);
 
-        circuit.run();
-        double[] probs = circuit.getProbabilities(IntStream.range(0, estimationCount).toArray());
+        QuantumCircuit qc = QuantumAlgorithms.amplitudeEstimation(estimationReg, targetReg, A, items, false);
+        qc.run();
+
+        double[] probs = qc.getProbabilities(IntStream.range(0, estimationCount).toArray());
 
         assertCloseTo(0.379, probs[9]);
         assertCloseTo(0.379, probs[23]);

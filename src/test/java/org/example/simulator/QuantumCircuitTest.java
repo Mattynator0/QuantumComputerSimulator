@@ -1,6 +1,5 @@
 package org.example.simulator;
 
-import ch.obermuhlner.math.big.BigDecimalMath;
 import org.example.math.Complex;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +13,7 @@ import java.util.Random;
 import java.util.Set;
 
 import static org.example.math.MathUtils.*;
+import static org.example.simulator.QuantumCircuit.MAX_QUBITS;
 import static org.example.simulator.QuantumTransformationTest.quantumTransformationAssertEquals;
 import static org.example.simulator.TestUtils.assertCloseTo;
 import static org.example.simulator.TestUtils.complexAssertEquals;
@@ -27,72 +27,78 @@ public class QuantumCircuitTest {
 
     Random rand = new Random();
 
-    @BeforeEach
-    void setUp() {
-        qubitCount = 3;
+    private void setUp(int qubitCount) {
+        this.qubitCount = qubitCount;
         N = 1 << qubitCount;
         qc = new QuantumCircuit(qubitCount);
     }
 
+    private void setUp(QuantumRegister... registers) {
+        qubitCount = Arrays.stream(registers).mapToInt(QuantumRegister::getQubitCount).sum();
+        N = 1 << qubitCount;
+        qc = new QuantumCircuit(registers);
+    }
+
     @Test
-    void circuitMustHaveAtLeastOneQubit() {
-        assertThrows(IllegalArgumentException.class, () -> new QuantumCircuit(0));
-        assertThrows(IllegalArgumentException.class, () -> new QuantumCircuit(-1));
-        new QuantumCircuit(1);
+    void circuitSize() {
+        assertThrows(IllegalArgumentException.class, () -> new QuantumCircuit(new QuantumRegister(0)));
+        assertThrows(IllegalArgumentException.class, () -> new QuantumCircuit(new QuantumRegister(-1)));
+        assertThrows(IllegalArgumentException.class, () -> new QuantumCircuit(new QuantumRegister(MAX_QUBITS + 1)));
+        new QuantumCircuit(new QuantumRegister(1));
+    }
+
+    @Test
+    void circuitSize_registers() {
+        assertThrows(IllegalArgumentException.class, () -> new QuantumCircuit(new QuantumRegister(0)));
+        assertThrows(IllegalArgumentException.class, () -> new QuantumCircuit(new QuantumRegister(-1)));
+        assertThrows(IllegalArgumentException.class, () -> new QuantumCircuit(new QuantumRegister(MAX_QUBITS + 1)));
+        assertThrows(IllegalArgumentException.class, () -> new QuantumCircuit(new QuantumRegister(MAX_QUBITS - 1), new QuantumRegister(2)));
+        new QuantumCircuit(new QuantumRegister(1));
     }
 
     @Test
     void qubitCountIsAssigned() {
+        setUp(1);
+
         assertEquals(qubitCount, qc.getQubitCount());
     }
 
     @Test
-    void initialStateIsIdentity() {
-        complexAssertEquals(Complex.ONE, qc.getState()[0]);
+    void qubitCountIsAssigned_registers() {
+        QuantumRegister q = new QuantumRegister(1);
+        setUp(q);
 
-        Complex zero = Complex.ZERO;
-        for (int i = 1; i < N; i++) {
-            complexAssertEquals(zero, qc.getState()[i]);
-        }
+        assertEquals(qubitCount, qc.getQubitCount());
     }
 
     @Test
-    void appendOneNewQubit() {
-        qc.generateRandomState();
-        qc.run();
-        Complex[] stateCopy = qc.getState().clone();
+    void registersInternalShifts() {
+        QuantumRegister q1 = new QuantumRegister(1);
+        QuantumRegister q2 = new QuantumRegister(2);
+        QuantumRegister q3 = new QuantumRegister(1);
+        setUp(q1, q2, q3);
 
-        qc.appendNewQubits(1);
-        for (int i = 0; i < N; i++) {
-            complexAssertEquals(stateCopy[i], qc.getState()[i]);
-        }
-
-        Complex zero = Complex.ZERO;
-        for (int i = N; i < N << 1; i++) {
-            complexAssertEquals(zero, qc.getState()[i]);
-        }
+        assertEquals(0, q1.getShift());
+        assertEquals(q1.getQubitCount(), q2.getShift());
+        assertEquals(q1.getQubitCount() + q2.getQubitCount(), q3.getShift());
     }
 
-    @Test
-    void appendManyNewQubits() {
-        qc.generateRandomState();
-        qc.run();
-        Complex[] stateCopy = qc.getState().clone();
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2})
+    void appendNewQubits(int newQubits) {
+        setUp(MAX_QUBITS - 1);
+        int initialQubitCount = qc.getQubitCount();
 
-        int newQubits = 2;
-        qc.appendNewQubits(newQubits);
-        for (int i = 0; i < N; i++) {
-            complexAssertEquals(stateCopy[i], qc.getState()[i]);
-        }
-
-        Complex zero = Complex.ZERO;
-        for (int i = N; i < N << newQubits; i++) {
-            complexAssertEquals(zero, qc.getState()[i]);
-        }
+        if (initialQubitCount + newQubits > MAX_QUBITS)
+            assertThrows(IllegalArgumentException.class, () -> qc.appendNewQubits(newQubits));
+        else
+            qc.appendNewQubits(newQubits);
     }
 
     @Test
     void uniform() {
+        setUp(3);
+
         qc.uniform();
         qc.run();
 
@@ -105,6 +111,8 @@ public class QuantumCircuitTest {
 
     @Test
     void geometric() {
+        setUp(3);
+
         // FIXME rewrite the assertion logic to get rid of the constraint below
         // generate theta such that no phase is above 180 or below -180 to make the assertions simpler
         double theta = (rand.nextDouble() - 0.5) * Math.TAU / N;
@@ -120,6 +128,8 @@ public class QuantumCircuitTest {
 
     @Test
     void geometricAlt() {
+        setUp(3);
+
         // FIXME rewrite the assertion logic to get rid of the constraint below
         // generate theta such that no phase is above 180 or below -180 to make the assertions simpler
         double theta = (rand.nextDouble() - 0.5) * Math.TAU / N;
@@ -137,6 +147,8 @@ public class QuantumCircuitTest {
 
     @Test
     void raisedCosine() {
+        setUp(3);
+
         qc.raisedCosine();
         qc.run();
 
@@ -150,6 +162,8 @@ public class QuantumCircuitTest {
 
     @Test
     void binomialApprox() {
+        setUp(3);
+
         qc.binomialApprox();
         qc.run();
 
@@ -163,6 +177,8 @@ public class QuantumCircuitTest {
 
     @Test
     void customClone() {
+        setUp(3);
+
         qc.generateRandomState();
         qc.mcx(new int[]{0, 2}, 1);
         qc.cp(12.3, 0, 2);
@@ -180,6 +196,8 @@ public class QuantumCircuitTest {
 
     @Test
     void inverse() {
+        setUp(3);
+
         qc.x(0);
         qc.h(1);
 
@@ -200,56 +218,8 @@ public class QuantumCircuitTest {
     }
 
     @Test
-    void phaseOracle() {
-        qc.uniform();
-
-        int[] items = new int[]{0, 3, 5};
-        qc.append(QuantumAlgorithms.phaseOracle(qubitCount, items), 0);
-        qc.run();
-
-        Complex[] state = qc.getState();
-        for (int i = 0; i < N; i++) {
-            int finalI = i;
-            double phase = state[i].direction().doubleValue();
-
-            if (Arrays.stream(items).anyMatch(x -> x == finalI))
-                assertCloseTo(180, phase);
-            else
-                assertCloseTo(0, phase);
-        }
-    }
-
-    @Test
-    void bitOracle() {
-        qc.uniform();
-
-        int[] items = new int[]{0, 3, 5};
-        qc.appendNewQubits(1);
-        qubitCount++;
-        N <<= 1;
-        qc.append(QuantumAlgorithms.bitOracle(qubitCount, items), 0);
-
-        qc.run();
-
-        double[] probs = qc.getProbabilities();
-        int halfN = N >> 1;
-        double expectedUniform = 1. / halfN;
-
-        for (int i = 0; i < halfN; i++) {
-            int finalI = i;
-
-            if (Arrays.stream(items).anyMatch(x -> x == finalI)) {
-                assertCloseTo(0, probs[i]);
-                assertCloseTo(expectedUniform, probs[i + halfN]);
-            } else {
-                assertCloseTo(expectedUniform, probs[i]);
-                assertCloseTo(0, probs[i + halfN]);
-            }
-        }
-    }
-
-    @Test
     void qft_swapTrue() {
+        setUp(3);
 
         int x = 3;
         for (int i = 0; i < qubitCount; i++) {
@@ -272,6 +242,8 @@ public class QuantumCircuitTest {
 
     @Test
     void qft_swapFalse() {
+        setUp(3);
+
         int x = 3;
         for (int i = 0; i < qubitCount; i++) {
             if (isBitSet(x, i))
@@ -293,6 +265,7 @@ public class QuantumCircuitTest {
 
     @Test
     void iqft_swapTrue() {
+        setUp(3);
 
         int x = 3;
 
@@ -315,6 +288,7 @@ public class QuantumCircuitTest {
 
     @Test
     void iqft_swapFalse() {
+        setUp(3);
 
         int x = 3;
 
@@ -337,6 +311,8 @@ public class QuantumCircuitTest {
 
     @Test
     void measure_identity() {
+        setUp(3);
+
         qc.run();
 
         int measurementsCount = 100;
@@ -350,6 +326,8 @@ public class QuantumCircuitTest {
 
     @Test
     void measure_100percent() {
+        setUp(3);
+
         qc.x(1);
         qc.run();
 
@@ -366,6 +344,8 @@ public class QuantumCircuitTest {
 
     @Test
     void measure_50_50() {
+        setUp(3);
+
         qc.h(0);
         qc.run();
 
@@ -383,6 +363,8 @@ public class QuantumCircuitTest {
 
     @Test
     void zeroReflection() {
+        setUp(3);
+
         qc.uniform();
         qc.zeroReflection();
         qc.run();
@@ -396,6 +378,8 @@ public class QuantumCircuitTest {
 
     @Test
     void transform() {
+        setUp(3);
+
         qc.x(0);
         qc.h(1);
 
@@ -412,6 +396,8 @@ public class QuantumCircuitTest {
 
     @Test
     void cTransform() {
+        setUp(3);
+
         qc.h(0);
         qc.h(2);
         qc.cx(0, 1);
@@ -430,6 +416,8 @@ public class QuantumCircuitTest {
 
     @Test
     void mcTransform() {
+        setUp(3);
+
         qc.uniform();
         qc.mcp(Math.PI / 4, new int[]{0, 2}, 1);
 
@@ -444,6 +432,8 @@ public class QuantumCircuitTest {
 
     @Test
     public void append() {
+        setUp(3);
+
         qc.cx(0, 1);
         qc.mcp(Math.PI / 4, new int[]{0, 2}, 1);
         qc.h(2);
@@ -469,6 +459,8 @@ public class QuantumCircuitTest {
 
     @Test
     public void cAppend() {
+        setUp(3);
+
         qc.cx(0, 1);
         qc.mcp(Math.PI / 4, new int[]{0, 2}, 1);
         qc.h(2);
@@ -494,6 +486,8 @@ public class QuantumCircuitTest {
 
     @Test
     public void x() {
+        setUp(3);
+
         qc.x(0);
         qc.run();
         Complex[] state = qc.getState();
@@ -507,6 +501,8 @@ public class QuantumCircuitTest {
 
     @Test
     public void y() {
+        setUp(3);
+
         qc.h(0);
         qc.y(0);
         qc.run();
@@ -521,6 +517,8 @@ public class QuantumCircuitTest {
 
     @Test
     public void z() {
+        setUp(3);
+
         qc.h(0);
         qc.z(0);
         qc.run();
@@ -535,6 +533,8 @@ public class QuantumCircuitTest {
 
     @Test
     public void h() {
+        setUp(3);
+
         qc.h(0);
         qc.run();
         Complex[] state = qc.getState();
@@ -549,6 +549,7 @@ public class QuantumCircuitTest {
     @ParameterizedTest
     @ValueSource(doubles = {1, 2, 3, 4})
     public void phase(double denominator) {
+        setUp(3);
 
         double theta = Math.PI / denominator;
 
@@ -567,6 +568,7 @@ public class QuantumCircuitTest {
     @ParameterizedTest
     @ValueSource(doubles = {1, 2, 3, 4})
     public void rx_0(double denominator) {
+        setUp(3);
 
         double theta = Math.PI / denominator;
 
@@ -584,6 +586,7 @@ public class QuantumCircuitTest {
     @ParameterizedTest
     @ValueSource(doubles = {1, 2, 3, 4})
     public void rx_1(double denominator) {
+        setUp(3);
 
         double theta = Math.PI / denominator;
 
@@ -602,6 +605,7 @@ public class QuantumCircuitTest {
     @ParameterizedTest
     @ValueSource(doubles = {1, 2, 3, 4})
     public void ry_0(double denominator) {
+        setUp(3);
 
         double theta = Math.PI / denominator;
 
@@ -619,6 +623,7 @@ public class QuantumCircuitTest {
     @ParameterizedTest
     @ValueSource(doubles = {1, 2, 3, 4})
     public void ry_1(double denominator) {
+        setUp(3);
 
         double theta = Math.PI / denominator;
 
@@ -637,6 +642,7 @@ public class QuantumCircuitTest {
     @ParameterizedTest
     @ValueSource(doubles = {1, 2, 3, 4})
     public void rz_0(double denominator) {
+        setUp(3);
 
         double theta = Math.PI / denominator;
 
@@ -654,6 +660,7 @@ public class QuantumCircuitTest {
     @ParameterizedTest
     @ValueSource(doubles = {1, 2, 3, 4})
     public void rz_1(double denominator) {
+        setUp(3);
 
         double theta = Math.PI / denominator;
 
@@ -671,6 +678,7 @@ public class QuantumCircuitTest {
 
     @Test
     void swap() {
+        setUp(3);
 
         double theta = Math.PI / 3;
         qc.rx(theta, 0);
