@@ -78,6 +78,8 @@ public class QuantumCircuit {
     }
 
     public void run() {
+        this.optimizeCircuit();
+
         this.prepareIdentityState();
 
         transformations.forEach(tr -> {
@@ -90,6 +92,40 @@ public class QuantumCircuit {
                 this.mcTransform(tr.getGate(), controls, tr.getTarget());
             }
         });
+    }
+
+    /// simple optimizer that removes identity operations
+    public void optimizeCircuit() {
+
+        for (int i = 0; i < transformations.size(); i++) {
+            QuantumTransformation t = transformations.get(i);
+
+            // TODO include controlled transformations
+            if (!t.getControls().isEmpty())
+                continue;
+
+            int j = i + 1;
+            while (j < transformations.size()) {
+                QuantumTransformation other = transformations.get(j);
+
+                if (t.getGate().equals(other.getGate())
+                        && other.getControls().isEmpty()
+                        && t.getTarget() == other.getTarget()
+                        && t.getArg() == -other.getArg()) {
+
+                    transformations.remove(j);
+                    transformations.remove(i);
+                    i--;
+                    break;
+                }
+                else if (t.getTarget() == other.getTarget()
+                        || other.getControls().contains(t.getTarget())) {
+                    break;
+                }
+
+                j++;
+            }
+        }
     }
 
     public void uniform() {
