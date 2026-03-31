@@ -43,7 +43,7 @@ public final class QuantumAlgorithms {
         QuantumCircuit qc = new QuantumCircuit(qubitCount);
 
         for (int value : values) {
-            for (int i = 0; i < qubitCount; i++) {
+            for (int i = 0; i < qubitCount - 1; i++) {
                 if (!isBitSet(value, i)) {
                     qc.x(i);
                 }
@@ -51,7 +51,7 @@ public final class QuantumAlgorithms {
 
             qc.mcx(IntStream.range(0, qubitCount - 1).toArray(), qubitCount - 1);
 
-            for (int i = 0; i < qubitCount; i++) {
+            for (int i = 0; i < qubitCount - 1; i++) {
                 if (!isBitSet(value, i)) {
                     qc.x(i);
                 }
