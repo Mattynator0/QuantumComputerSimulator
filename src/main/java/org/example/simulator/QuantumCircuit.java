@@ -409,6 +409,20 @@ public class QuantumCircuit {
         }
     }
 
+    /// Prints some important information regarding the quantum circuit.
+    /// @apiNote  Some data will be missing if method is called before {@code run()}.
+    /// Moreover, some data might be wrong if other circuit have been run or if other print methods have been called.
+    public void printAnalytics() {
+
+        CircuitAnalyticsDTO dto = new CircuitAnalyticsDTO();
+
+        dto.transformations = transformations.size();
+        dto.controlledOperations = (int) transformations.stream().filter(t -> !t.getControls().isEmpty()).count();
+        dto.complexOperations = Complex.performedOperations;
+
+        System.out.println(dto);
+    }
+
     public void zeroReflection() {
 
         for (int i = 0; i < qubitCount; i++) {

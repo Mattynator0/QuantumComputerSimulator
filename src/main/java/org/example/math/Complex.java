@@ -8,6 +8,8 @@ import static org.example.math.BigDecimalMathHelper.*;
 
 public final class Complex {
 
+    public static int performedOperations = 0;
+
     public final BigDecimal re;
     public final BigDecimal im;
 
@@ -36,6 +38,7 @@ public final class Complex {
     }
 
     public Complex add(Complex other) {
+        performedOperations++;
         return new Complex(
                 this.re.add(other.re, MC).stripTrailingZeros(),
                 this.im.add(other.im, MC).stripTrailingZeros()
@@ -43,6 +46,7 @@ public final class Complex {
     }
 
     public Complex multiply(Complex other) {
+        performedOperations++;
         return new Complex(
                 this.re.multiply(other.re, MC).subtract(this.im.multiply(other.im, MC), MC).stripTrailingZeros(),
                 this.re.multiply(other.im, MC).add(this.im.multiply(other.re, MC), MC).stripTrailingZeros()
@@ -50,14 +54,17 @@ public final class Complex {
     }
 
     public Complex conjugate() {
+        performedOperations++;
         return new Complex(re, im.negate());
     }
 
     public BigDecimal abs() {
+        performedOperations++;
         return BigDecimalMath.sqrt(absSquared(), MC);
     }
 
     public BigDecimal absSquared() {
+        performedOperations++;
         return re.multiply(re, MC).add(im.multiply(im, MC), MC);
     }
 
@@ -67,10 +74,12 @@ public final class Complex {
     }
 
     public static Complex cis(BigDecimal theta) {
+        performedOperations++;
         return new Complex(BigDecimalMath.cos(theta, MC), BigDecimalMath.sin(theta, MC));
     }
 
     public BigDecimal direction() {
+        performedOperations++;
         if (im.equals(BigDecimal.ZERO) && re.equals(BigDecimal.ZERO))
             return BigDecimal.ZERO;
 
