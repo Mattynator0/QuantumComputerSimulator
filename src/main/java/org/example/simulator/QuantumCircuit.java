@@ -257,6 +257,74 @@ public class QuantumCircuit {
         }
     }
 
+    /// Encodes values in the array as a uniform superposition. Expected to run on an identity statevector.
+    public void initializeWithValues(QuantumRegister reg, int[] values) {
+
+        if (values.length < 1)
+            return;
+
+        if (values.length == 1) {
+            for (int i = 0; i < qubitCount; i++) {
+                if (isBitSet(values[0], i))
+                    this.x(reg.get(i));
+            }
+            return;
+        }
+
+        // FIXME this algorithm doesn't initialize the states with uniform amplitudes
+        initializerTree(0, 0, reg, Arrays.stream(values).boxed().toList());
+    }
+
+    private void initializerTree(int level, int branchValue, QuantumRegister reg, List<Integer> valuesToEncode) {
+
+        if (level >= qubitCount)
+            return;
+
+        List<Integer> zeros = new ArrayList<>();
+        List<Integer> ones = new ArrayList<>();
+        int mask = 1 << level;
+
+        for (int v : valuesToEncode) {
+            if ((v & mask) == 0)
+                zeros.add(v);
+            else
+                ones.add(v);
+        }
+
+        // case 1: only zeros on this qubit
+        if (ones.isEmpty()) {
+            initializerTree(level + 1, branchValue, reg, zeros);
+        }
+        // case 2: only ones on this qubit
+        else if (zeros.isEmpty()) {
+            for (int i = 0; i < level; i++) {
+                if (!isBitSet(branchValue, i))
+                    this.x(reg.get(i));
+            }
+            this.mcx(reg.range(0, level), reg.get(level));
+            for (int i = 0; i < level; i++) {
+                if (!isBitSet(branchValue, i))
+                    this.x(reg.get(i));
+            }
+
+            initializerTree(level + 1, branchValue + mask, reg, ones);
+        }
+        // case 3: mix of zeros and ones
+        else {
+            for (int i = 0; i < level; i++) {
+                if (!isBitSet(branchValue, i))
+                    this.x(reg.get(i));
+            }
+            this.mch(reg.range(0, level), reg.get(level));
+            for (int i = 0; i < level; i++) {
+                if (!isBitSet(branchValue, i))
+                    this.x(reg.get(i));
+            }
+            initializerTree(level + 1, branchValue, reg, zeros);
+            initializerTree(level + 1, branchValue + mask, reg, ones);
+        }
+    }
+
     public int[] measure(int samples) {
         // TODO make an overload with a QuantumRegister as input
         List<BigDecimal> probabilities = Arrays.stream(state)
