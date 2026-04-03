@@ -14,9 +14,6 @@ import static org.example.math.MathUtils.getOptimalGroverIterations;
 
 public class CircuitExamples {
 
-    // FIXME circuit examples shouldn't require so many arguments
-    // FIXME a potential user can just copy the contents to main() and adjust them by themself
-
     public static QuantumCircuit grover(int qubitCount, int[] goodResults) {
 
         // prepare a uniform state (although this implementation also works with other starting states)
@@ -36,6 +33,7 @@ public class CircuitExamples {
 
         // create a fourier basis state (phase angles increasing by a constant amount)
         QuantumCircuit qc = new QuantumCircuit(qubitCount);
+        qc.uniform();
         qc.geometric(fourierBasis * Math.TAU / (1 << qubitCount));
 
         // apply inverse quantum fourier transform
@@ -122,7 +120,7 @@ public class CircuitExamples {
         QuantumCircuit oracle = new QuantumCircuit(oracleReg);
 
         // tag states where value >= 0
-        int last = oracleReg.getLast();
+        int last = oracleReg.last();
         oracle.x(last);
         oracle.mcp(Math.PI, oracleReg.range(0, last), last);
         oracle.x(last);

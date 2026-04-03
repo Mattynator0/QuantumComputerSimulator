@@ -116,6 +116,7 @@ public class QuantumCircuitTest {
         // FIXME rewrite the assertion logic to get rid of the constraint below
         // generate theta such that no phase is above 180 or below -180 to make the assertions simpler
         double theta = (rand.nextDouble() - 0.5) * Math.TAU / N;
+        qc.uniform();
         qc.geometric(theta);
         qc.run();
 
@@ -231,6 +232,7 @@ public class QuantumCircuitTest {
         qc.run();
 
         QuantumCircuit expected = new QuantumCircuit(qubitCount);
+        expected.uniform();
         expected.geometric(x * Math.TAU / N);
         expected.run();
 
@@ -254,6 +256,7 @@ public class QuantumCircuitTest {
         qc.run();
 
         QuantumCircuit expected = new QuantumCircuit(qubitCount);
+        expected.uniform();
         expected.geometric(x * Math.TAU / N);
         expected.run();
 

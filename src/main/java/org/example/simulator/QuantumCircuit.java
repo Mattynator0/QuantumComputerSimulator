@@ -4,13 +4,19 @@ import lombok.Getter;
 import lombok.val;
 import org.example.math.Complex;
 import org.example.math.ComplexMatrix;
+import org.knowm.xchart.SwingWrapper;
+import org.knowm.xchart.XYChart;
+import org.knowm.xchart.XYChartBuilder;
+import org.knowm.xchart.XYSeries;
 
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.example.math.BigDecimalMathHelper.*;
+import static org.example.math.MathUtils.isBitSet;
 import static org.example.math.MathUtils.reverseArray;
 
 public class QuantumCircuit {
@@ -23,10 +29,17 @@ public class QuantumCircuit {
 
     private final Random random = new Random();
 
-    public static final int MAX_QUBITS = 20;
+    public static final int MAX_QUBITS = 21;
 
     @Getter
     private final List<QuantumTransformation> transformations = new ArrayList<>();
+
+    // full circuit register used solely for its indexing methods
+    private QuantumRegister qubits;
+
+    private final CircuitAnalyticsDTO analyticsDTO = new CircuitAnalyticsDTO();
+
+    /// ## CONSTRUCTORS
 
     public QuantumCircuit(final int qubitCount) {
 
@@ -37,6 +50,7 @@ public class QuantumCircuit {
             throw new IllegalArgumentException("Circuit is too big, qubit count is " + qubitCount);
 
         this.qubitCount = qubitCount;
+        qubits = new QuantumRegister(qubitCount);
     }
 
     public QuantumCircuit(QuantumRegister... registers) {
@@ -51,37 +65,19 @@ public class QuantumCircuit {
             throw new IllegalArgumentException("Qubit count must be > 0");
 
         if (qubitsBefore > MAX_QUBITS)
-            throw new IllegalArgumentException("Circuit is too big, qubit count is " + qubitCount + ", must be <= " + MAX_QUBITS);
+            throw new IllegalArgumentException("Circuit is too big, qubit count is " + qubitsBefore + ", must be <= " + MAX_QUBITS);
 
         this.qubitCount = qubitsBefore;
+        qubits = new QuantumRegister(qubitCount);
     }
 
-    private void prepareIdentityState() {
-        int size = 1 << qubitCount;
-        this.state = new Complex[size];
-
-        state[0] = Complex.ONE;
-        for (int i = 1; i < size; i++) {
-            state[i] = Complex.ZERO;
-        }
-    }
-
-    /**
-     * @apiNote  Calling this after `run()` will lead to errors.
-     */
-    void appendNewQubits(int n) {
-
-        if (qubitCount + n > MAX_QUBITS)
-            throw new IllegalArgumentException("Resulting circuit is too big; qubit count becomes " + (qubitCount + n) + ", max is " + MAX_QUBITS);
-
-        qubitCount += n;
-    }
+    /// ## API
 
     public void run() {
         this.optimizeCircuit();
-
         this.prepareIdentityState();
 
+        long start = System.currentTimeMillis();
         transformations.forEach(tr -> {
             List<Integer> controls = tr.getControls();
             if (controls.isEmpty())
@@ -92,105 +88,14 @@ public class QuantumCircuit {
                 this.mcTransform(tr.getGate(), controls, tr.getTarget());
             }
         });
-    }
-
-    /// simple optimizer that removes identity operations
-    public void optimizeCircuit() {
-
-        for (int i = 0; i < transformations.size(); i++) {
-            QuantumTransformation t = transformations.get(i);
-
-            // TODO include controlled transformations
-            if (!t.getControls().isEmpty())
-                continue;
-
-            int j = i + 1;
-            while (j < transformations.size()) {
-                QuantumTransformation other = transformations.get(j);
-
-                if (t.getGate().equals(other.getGate())
-                        && other.getControls().isEmpty()
-                        && t.getTarget() == other.getTarget()
-                        && t.getArg() == -other.getArg()) {
-
-                    transformations.remove(j);
-                    transformations.remove(i);
-                    i--;
-                    break;
-                }
-                else if (t.getTarget() == other.getTarget()
-                        || other.getControls().contains(t.getTarget())) {
-                    break;
-                }
-
-                j++;
-            }
-        }
-    }
-
-    public void uniform() {
-        for (int i = 0; i < this.qubitCount; i++) {
-            this.h(i);
-        }
-    }
-
-    public void uniform(QuantumRegister reg) {
-        reg.allAsStream().forEach(this::h);
-    }
-
-    public void generateRandomState() {
-        // FIXME phases are symmetric around |2^(n-1)> state which is not very random
-
-        for (int i = 0; i < qubitCount; i++) {
-            double theta = random.nextDouble() * Math.PI;
-            double phi = random.nextDouble() * 2 * Math.PI;
-
-            this.ry(theta, i);
-            this.rz(phi, i);
-        }
-    }
-
-    public void geometric(double theta) {
-        for (int i = 0; i < qubitCount; i++) {
-            this.h(i);
-            this.phase((1 << i) * theta, i);
-        }
-    }
-
-    public void geometricAlt(double theta) {
-        for (int i = 0; i < qubitCount; i++) {
-            this.h(i);
-            this.phase((1 << qubitCount - 1 - i) * theta, i);
-        }
-    }
-
-    // normal distribution approximation
-    public void raisedCosine() {
-        int lastQubit = this.qubitCount - 1;
-
-        this.h(lastQubit);
-        this.phase(Math.PI * -1, lastQubit);
-        this.qft(false);
-    }
-
-    public void binomialApprox() {
-        int lastQubit = this.qubitCount - 1;
-        double theta = Math.acos(Math.sqrt(2. / 3));
-
-        this.ry(2 * theta, lastQubit);
-        this.phase(Math.PI, lastQubit);
-        this.cry(Math.PI / 2, lastQubit, 0);
-
-        for (int i = 1; i < qubitCount - 1; i++)
-            this.cx(0, i);
-
-        this.qft(false);
+        long end = System.currentTimeMillis();
+        analyticsDTO.executionTimeMillis = end - start;
     }
 
     @Override
     public QuantumCircuit clone() {
         QuantumCircuit copy = new QuantumCircuit(qubitCount);
-        transformations.forEach(t -> copy.appendTransformation(t.clone()));
+        transformations.forEach(t -> copy.transformations.add(t.clone()));
         return copy;
     }
 
@@ -198,132 +103,59 @@ public class QuantumCircuit {
         QuantumCircuit inverted = new QuantumCircuit(qubitCount);
 
         for (int i = this.transformations.size() - 1; i >= 0; i--) {
-            inverted.appendTransformation(this.transformations.get(i).inverse());
+            inverted.transformations.add(this.transformations.get(i).inverse());
         }
 
         return inverted;
     }
 
-    public void qft(boolean swap) {
-        _qft(false, IntStream.range(0, qubitCount).toArray(), swap);
+    public void append(QuantumCircuit other) {
+        append(other, 0);
     }
 
-    public void qft(int[] targets, boolean swap) {
-        _qft(false, targets, swap);
+    public void append(QuantumCircuit other, QuantumRegister reg) {
+        append(other, reg.getShift());
     }
 
-    public void iqft(boolean swap) {
-        _qft(true, IntStream.range(0, qubitCount).toArray(), swap);
+    public void append(QuantumCircuit other, QuantumRegister... regs) {
+        IntStream merged = Stream.of(regs).flatMapToInt(QuantumRegister::allAsStream);
+
+        QuantumCircuit shifted = other.remapQubits(merged.toArray());
+        append(shifted, 0);
     }
 
-    public void iqft(int[] targets, boolean swap) {
-        _qft(true, targets, swap);
+    public void append(QuantumCircuit other, int shift) {
+        if (other.qubitCount + shift > this.qubitCount)
+            throw new IllegalArgumentException("Appended quantum circuit doesn't fit on this circuit.\nthis.qubitCount = "
+                    + this.qubitCount + ", other.qubitCount = "
+                    + other.qubitCount + ", shift = " + shift);
+
+        List<QuantumTransformation> otherTransformations = new ArrayList<>(other.clone().transformations);
+        otherTransformations.forEach(t -> t.shiftQubits(shift));
+
+        this.transformations.addAll(otherTransformations);
     }
 
-    private void _qft(boolean inverse, int[] targets, boolean swap) {
-        int factor = inverse ? -1 : 1;
-
-        if (!swap) {
-            reverseArray(targets);
-        }
-
-        for (int i = targets.length - 1; i >= 0; i--) {
-            this.h(targets[i]);
-            for (int j = i - 1; j >= 0; j--) {
-                double theta = factor * Math.PI * Math.pow(2, (j - i));
-                this.cp(theta, targets[i], targets[j]);
-            }
-        }
-
-        if (swap)
-            this.mswap(targets);
+    public void cAppend(int control, QuantumCircuit other, QuantumRegister reg) {
+        cAppend(control, other, reg.getShift());
     }
 
-    public void encodeTerms(double coeff, int[] vars, QuantumRegister keyReg, QuantumRegister valueReg) {
+    public void cAppend(int control, QuantumCircuit other, int shift) {
+        if (other.qubitCount + shift > this.qubitCount)
+            throw new IllegalArgumentException("Appended quantum circuit doesn't fit on this circuit.\nthis.qubitCount = "
+                    + this.qubitCount + ", other.qubitCount = "
+                    + other.qubitCount + ", shift = " + shift);
 
-        if (qubitCount < keyReg.getQubitCount() + valueReg.getQubitCount())
-            throw new IllegalArgumentException("Circuit is too small for the key and value registers");
+        List<QuantumTransformation> otherTransformations = new ArrayList<>(other.clone().transformations);
+        otherTransformations.forEach(t -> {
+            t.shiftQubits(shift);
+            t.addControl(control);
+        });
 
-        for (int i : valueReg.all()) {
-            double theta = Math.PI * coeff / (1 << i);
-
-            if (vars.length > 1) {
-                this.mcp(theta, Arrays.stream(vars).map(keyReg::get).toArray(), i);
-            } else if (vars.length == 1) {
-                this.cp(theta, keyReg.get(vars[0]), i);
-            } else {
-                this.phase(theta, i);
-            }
-        }
+        this.transformations.addAll(otherTransformations);
     }
 
-    /// Encodes values in the array as a uniform superposition. Expected to run on an identity statevector.
-    public void initializeWithValues(QuantumRegister reg, int[] values) {
-
-        if (values.length < 1)
-            return;
-
-        if (values.length == 1) {
-            for (int i = 0; i < qubitCount; i++) {
-                if (isBitSet(values[0], i))
-                    this.x(reg.get(i));
-            }
-            return;
-        }
-
-        // FIXME this algorithm doesn't initialize the states with uniform amplitudes
-        initializerTree(0, 0, reg, Arrays.stream(values).boxed().toList());
-    }
-
-    private void initializerTree(int level, int branchValue, QuantumRegister reg, List<Integer> valuesToEncode) {
-
-        if (level >= qubitCount)
-            return;
-
-        List<Integer> zeros = new ArrayList<>();
-        List<Integer> ones = new ArrayList<>();
-        int mask = 1 << level;
-
-        for (int v : valuesToEncode) {
-            if ((v & mask) == 0)
-                zeros.add(v);
-            else
-                ones.add(v);
-        }
-
-        // case 1: only zeros on this qubit
-        if (ones.isEmpty()) {
-            initializerTree(level + 1, branchValue, reg, zeros);
-        }
-        // case 2: only ones on this qubit
-        else if (zeros.isEmpty()) {
-            for (int i = 0; i < level; i++) {
-                if (!isBitSet(branchValue, i))
-                    this.x(reg.get(i));
-            }
-            this.mcx(reg.range(0, level), reg.get(level));
-            for (int i = 0; i < level; i++) {
-                if (!isBitSet(branchValue, i))
-                    this.x(reg.get(i));
-            }
-
-            initializerTree(level + 1, branchValue + mask, reg, ones);
-        }
-        // case 3: mix of zeros and ones
-        else {
-            for (int i = 0; i < level; i++) {
-                if (!isBitSet(branchValue, i))
-                    this.x(reg.get(i));
-            }
-            this.mch(reg.range(0, level), reg.get(level));
-            for (int i = 0; i < level; i++) {
-                if (!isBitSet(branchValue, i))
-                    this.x(reg.get(i));
-            }
-            initializerTree(level + 1, branchValue, reg, zeros);
-            initializerTree(level + 1, branchValue + mask, reg, ones);
-        }
-    }
+    /// ## INFORMATION
 
     public int[] measure(int samples) {
         // TODO make an overload with a QuantumRegister as input
@@ -347,7 +179,6 @@ public class QuantumCircuit {
     }
 
     public int measureOnce() {
-        // TODO make an overload with a QuantumRegister as input
         List<BigDecimal> probabilities = Arrays.stream(state)
                 .map(Complex::absSquared)
                 .toList();
@@ -356,6 +187,20 @@ public class QuantumCircuit {
         double total = 0.0;
         for (int i = 0; i < probabilities.size(); i++) {
             total += probabilities.get(i).doubleValue();
+            if (total > rng) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    public int measureOnce(QuantumRegister reg) {
+        double[] probabilities = this.getProbabilities(reg.all());
+
+        double rng = random.nextDouble();
+        double total = 0.0;
+        for (int i = 0; i < probabilities.length; i++) {
+            total += probabilities[i];
             if (total > rng) {
                 return i;
             }
@@ -477,32 +322,28 @@ public class QuantumCircuit {
         }
     }
 
-    /// Prints some important information regarding the quantum circuit.
+    /// Prints analytics regarding the quantum circuit in the terminal.
     /// @apiNote  Some data will be missing if method is called before {@code run()}.
-    /// Moreover, some data might be wrong if other circuit have been run or if other print methods have been called.
     public void printAnalytics() {
 
-        CircuitAnalyticsDTO dto = new CircuitAnalyticsDTO();
+        analyticsDTO.transformations = transformations.size();
+        analyticsDTO.controlledOperations = (int) transformations.stream()
+                .filter(t -> !t.getControls().isEmpty())
+                .count();
 
-        dto.transformations = transformations.size();
-        dto.controlledOperations = (int) transformations.stream().filter(t -> !t.getControls().isEmpty()).count();
-        dto.complexOperations = Complex.performedOperations;
-
-        System.out.println(dto);
+        System.out.println(analyticsDTO);
     }
 
-    public void zeroReflection() {
+    public void displayProbabilityChart(int[] targets) {
+        // FIXME indexing starts at 1 instead of 0
+        XYChart chart = new XYChartBuilder().build();
+        XYSeries series = chart.addSeries("probability", this.getProbabilities(targets));
+        series.setXYSeriesRenderStyle(XYSeries.XYSeriesRenderStyle.Scatter);
 
-        for (int i = 0; i < qubitCount; i++) {
-            this.x(i);
-        }
-
-        this.mcp(Math.PI, IntStream.range(0, qubitCount - 1).toArray(), qubitCount - 1);
-
-        for (int i = 0; i < qubitCount; i++) {
-            this.x(i);
-        }
+        new SwingWrapper<>(chart).displayChart();
     }
+
+    /// ## UTILITY
 
     private void transform(Gate gate, int target) {
 
@@ -544,55 +385,272 @@ public class QuantumCircuit {
         Complex x = state[k0];
         Complex y = state[k1];
 
+        analyticsDTO.statevectorOperations++;
         state[k0] = x.multiply(gateMatrix.get(0, 0)).add(y.multiply(gateMatrix.get(0, 1)));
         state[k1] = x.multiply(gateMatrix.get(1, 0)).add(y.multiply(gateMatrix.get(1, 1)));
     }
 
-    public void appendTransformation(QuantumTransformation quantumTransformation) {
-        transformations.add(quantumTransformation);
+    private void initializerTree(int level, int branchValue, QuantumRegister reg, List<Integer> valuesToEncode) {
+
+        if (level >= qubitCount)
+            return;
+
+        List<Integer> zeros = new ArrayList<>();
+        List<Integer> ones = new ArrayList<>();
+        int mask = 1 << level;
+
+        for (int v : valuesToEncode) {
+            if ((v & mask) == 0)
+                zeros.add(v);
+            else
+                ones.add(v);
+        }
+
+        // case 1: only zeros on this qubit
+        if (ones.isEmpty()) {
+            initializerTree(level + 1, branchValue, reg, zeros);
+        }
+        // case 2: only ones on this qubit
+        else if (zeros.isEmpty()) {
+            for (int i = 0; i < level; i++) {
+                if (!isBitSet(branchValue, i))
+                    this.x(reg.get(i));
+            }
+            this.mcx(reg.range(0, level), reg.get(level));
+            for (int i = 0; i < level; i++) {
+                if (!isBitSet(branchValue, i))
+                    this.x(reg.get(i));
+            }
+
+            initializerTree(level + 1, branchValue + mask, reg, ones);
+        }
+        // case 3: mix of zeros and ones
+        else {
+            for (int i = 0; i < level; i++) {
+                if (!isBitSet(branchValue, i))
+                    this.x(reg.get(i));
+            }
+            this.mch(reg.range(0, level), reg.get(level));
+            for (int i = 0; i < level; i++) {
+                if (!isBitSet(branchValue, i))
+                    this.x(reg.get(i));
+            }
+            initializerTree(level + 1, branchValue, reg, zeros);
+            initializerTree(level + 1, branchValue + mask, reg, ones);
+        }
     }
 
-    public void appendAllTransformations(List<QuantumTransformation> quantumTransformations) {
-        transformations.addAll(quantumTransformations);
+    /**
+     * @apiNote Calling this after {@code run()} might lead to problems due to the size of the statevector not matching the new qubit count.
+     */
+    void appendNewQubits(int n) {
+
+        if (qubitCount + n > MAX_QUBITS)
+            throw new IllegalArgumentException("Resulting circuit is too big; qubit count becomes " + (qubitCount + n) + ", max is " + MAX_QUBITS);
+
+        qubitCount += n;
+        qubits = new QuantumRegister(qubitCount);
     }
 
-    public void append(QuantumCircuit other) {
-        append(other, 0);
+    private void prepareIdentityState() {
+        int size = 1 << qubitCount;
+        this.state = new Complex[size];
+
+        state[0] = Complex.ONE;
+        for (int i = 1; i < size; i++) {
+            state[i] = Complex.ZERO;
+        }
     }
 
-    public void append(QuantumCircuit other, QuantumRegister reg) {
-        append(other, reg.getShift());
+    /** Simple optimizer that removes identity operations. */
+    private void optimizeCircuit() {
+        for (int i = 0; i < transformations.size(); i++) {
+            QuantumTransformation t = transformations.get(i);
+
+            // TODO include controlled transformations
+            if (!t.getControls().isEmpty())
+                continue;
+
+            int j = i + 1;
+            while (j < transformations.size()) {
+                QuantumTransformation other = transformations.get(j);
+
+                if (t.getGate().equals(other.getGate())
+                        && other.getControls().isEmpty()
+                        && t.getTarget() == other.getTarget()
+                        && t.getArg() == -other.getArg()) {
+
+                    transformations.remove(j);
+                    transformations.remove(i);
+                    i--;
+                    break;
+                }
+                else if (t.getTarget() == other.getTarget()
+                        || other.getControls().contains(t.getTarget())) {
+                    break;
+                }
+
+                j++;
+            }
+        }
     }
 
-    public void append(QuantumCircuit other, int shift) {
-        if (other.qubitCount + shift > this.qubitCount)
-            throw new IllegalArgumentException("Appended quantum circuit doesn't fit on this circuit.\nthis.qubitCount = "
-                    + this.qubitCount + ", other.qubitCount = "
-                    + other.qubitCount + ", shift = " + shift);
+    private QuantumCircuit remapQubits(int[] newIndices) {
 
-        List<QuantumTransformation> otherTransformations = new ArrayList<>(other.clone().transformations);
-        otherTransformations.forEach(t -> t.shiftQubits(shift));
+        QuantumCircuit remapped = new QuantumCircuit(qubitCount);
 
-        this.transformations.addAll(otherTransformations);
-    }
-
-    public void cAppend(int control, QuantumCircuit other, QuantumRegister reg) {
-        cAppend(control, other, reg.getShift());
-    }
-
-    public void cAppend(int control, QuantumCircuit other, int shift) {
-        if (other.qubitCount + shift > this.qubitCount)
-            throw new IllegalArgumentException("Appended quantum circuit doesn't fit on this circuit.\nthis.qubitCount = "
-                    + this.qubitCount + ", other.qubitCount = "
-                    + other.qubitCount + ", shift = " + shift);
-
-        List<QuantumTransformation> otherTransformations = new ArrayList<>(other.clone().transformations);
-        otherTransformations.forEach(t -> {
-            t.shiftQubits(shift);
-            t.addControl(control);
+        transformations.forEach(t -> {
+            remapped.transformations.add(new QuantumTransformation(
+                    t.getGate(),
+                    t.getControls().stream().map(i -> newIndices[i]).collect(Collectors.toList()),
+                    newIndices[t.getTarget()],
+                    t.getArg()
+            ));
         });
 
-        this.transformations.addAll(otherTransformations);
+        return remapped;
+    }
+
+    /// ## STATE INITIALIZERS
+
+    public void uniform() {
+        this.h(qubits.all());
+    }
+
+    public void generateRandomState() {
+        // FIXME phases are symmetric around |2^(n-1)> state which is not very random
+
+        for (int i : qubits.all()) {
+            double theta = random.nextDouble() * Math.PI;
+            double phi = random.nextDouble() * 2 * Math.PI;
+
+            this.ry(theta, i);
+            this.rz(phi, i);
+        }
+    }
+
+    public void geometric(double theta) {
+        for (int i : qubits.all()) {
+            this.phase((1 << i) * theta, i);
+        }
+    }
+
+    public void geometricAlt(double theta) {
+        for (int i : qubits.all()) {
+            this.h(i);
+            this.phase((1 << qubitCount - 1 - i) * theta, i);
+        }
+    }
+
+    /// normal distribution approximation
+    public void raisedCosine() {
+        this.h(qubits.last());
+        this.phase(Math.PI * -1, qubits.last());
+        this.qft(false);
+    }
+
+    public void binomialApprox() {
+        double theta = Math.acos(Math.sqrt(2. / 3));
+
+        this.ry(2 * theta, qubits.last());
+        this.phase(Math.PI, qubits.last());
+        this.cry(Math.PI / 2, qubits.last(), 0);
+
+        for (int i = 1; i < qubitCount - 1; i++)
+            this.cx(0, i);
+
+        this.qft(false);
+    }
+
+    /** Creates a state with probabilities equal to cos^2(k * pi * freq/2)
+     *
+     * @param frequency frequency of the squared cosine wave
+     */
+    public void squaredCosine(int frequency) {
+        this.initializeWithValues(qubits, new int[] {0, frequency});
+        this.qft(true);
+    }
+    
+    /// Encodes values in the array as a uniform superposition. Expected to run on the identity statevector.
+    public void initializeWithValues(QuantumRegister reg, int[] values) {
+
+        if (values.length < 1)
+            return;
+
+        if (values.length == 1) {
+            for (int i : qubits.all()) {
+                if (isBitSet(values[0], i))
+                    this.x(reg.get(i));
+            }
+            return;
+        }
+
+        // FIXME this algorithm doesn't initialize the states with uniform amplitudes
+        initializerTree(0, 0, reg, Arrays.stream(values).boxed().toList());
+    }
+
+    /// ## ALGORITHMS
+    
+    public void qft(boolean swap) {
+        _qft(false, IntStream.range(0, qubitCount).toArray(), swap);
+    }
+
+    public void qft(int[] targets, boolean swap) {
+        _qft(false, targets, swap);
+    }
+
+    public void iqft(boolean swap) {
+        _qft(true, IntStream.range(0, qubitCount).toArray(), swap);
+    }
+
+    public void iqft(int[] targets, boolean swap) {
+        _qft(true, targets, swap);
+    }
+
+    private void _qft(boolean inverse, int[] targets, boolean swap) {
+        int factor = inverse ? -1 : 1;
+
+        if (!swap) {
+            reverseArray(targets);
+        }
+
+        for (int i = targets.length - 1; i >= 0; i--) {
+            this.h(targets[i]);
+            for (int j = i - 1; j >= 0; j--) {
+                double theta = factor * Math.PI * Math.pow(2, (j - i));
+                this.cp(theta, targets[i], targets[j]);
+            }
+        }
+
+        if (swap)
+            this.mswap(targets);
+    }
+
+    public void encodeTerms(double coeff, int[] vars, QuantumRegister keyReg, QuantumRegister valueReg) {
+
+        if (qubitCount < keyReg.getQubitCount() + valueReg.getQubitCount())
+            throw new IllegalArgumentException("Circuit is too small for the key and value registers");
+
+        for (int i : valueReg.all()) {
+            double theta = Math.PI * coeff / (1 << i);
+
+            if (vars.length > 1) {
+                this.mcp(theta, keyReg.get(vars), i);
+            } else if (vars.length == 1) {
+                this.cp(theta, keyReg.get(vars[0]), i);
+            } else {
+                this.phase(theta, i);
+            }
+        }
+    }
+
+    public void zeroReflection() {
+
+        this.x(qubits.all());
+
+        this.mcp(Math.PI, qubits.allButLast(), qubits.last());
+
+        this.x(qubits.all());
     }
 
     public void add(int x) {
@@ -600,15 +658,23 @@ public class QuantumCircuit {
         this.qft(true);
 
         double theta = x * Math.TAU / (1 << qubitCount);
-        for (int i = 0; i < qubitCount; i++) {
-            this.phase((1 << i) * theta, i);
-        }
+        this.geometric(theta);
 
         this.iqft(true);
     }
 
+    /// ## GATES
+
     public void x(int target) {
         transformations.add(new QuantumTransformation(Gate.X, target));
+    }
+
+    public void x(int[] targets) {
+        Arrays.stream(targets).forEach(this::x);
+    }
+
+    public void x(QuantumRegister reg) {
+        reg.allAsStream().forEach(this::x);
     }
 
     public void y(int target) {
@@ -623,8 +689,24 @@ public class QuantumCircuit {
         transformations.add(new QuantumTransformation(Gate.H, target));
     }
 
+    public void h(int[] targets) {
+        Arrays.stream(targets).forEach(this::h);
+    }
+
+    public void h(QuantumRegister reg) {
+        reg.allAsStream().forEach(this::h);
+    }
+
     public void phase(double theta, int target) {
         transformations.add(new QuantumTransformation(Gate.PHASE(theta), target, theta));
+    }
+
+    public void phase(double theta, int[] targets) {
+        Arrays.stream(targets).forEach(t -> this.phase(theta, t));
+    }
+
+    public void phase(double theta, QuantumRegister reg) {
+        reg.allAsStream().forEach(t -> this.phase(theta, t));
     }
 
     public void rx(double theta, int target) {
@@ -673,6 +755,11 @@ public class QuantumCircuit {
     public void mcx(int[] controls, int target) {
         List<Integer> controlList = Arrays.stream(controls).boxed().collect(Collectors.toList());
         transformations.add(new QuantumTransformation(Gate.X, controlList, target));
+    }
+
+    public void mch(int[] controls, int target) {
+        List<Integer> controlList = Arrays.stream(controls).boxed().collect(Collectors.toList());
+        transformations.add(new QuantumTransformation(Gate.H, controlList, target));
     }
 
     public void mswap(int[] targets) {

@@ -3,6 +3,7 @@ package org.example.simulator;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.Arrays;
 import java.util.stream.IntStream;
 
 @Getter
@@ -22,21 +23,23 @@ public class QuantumRegister {
     }
 
     public int get(int index) {
-        index %= qubitCount;
-        return index >= 0
-                ? index + shift
-                : qubitCount + index + shift;
+        return (qubitCount + (index % qubitCount)) % qubitCount + shift;
     }
 
-    public int getFirst() {
+    public int[] get(int[] indices) {
+
+        return Arrays.stream(indices).map(this::get).toArray();
+    }
+
+    public int first() {
         return shift;
     }
 
-    public int getLast() {
+    public int last() {
         return qubitCount - 1 + shift;
     }
 
-    public int getEnd() {
+    public int end() {
         return qubitCount + shift;
     }
 
@@ -44,11 +47,15 @@ public class QuantumRegister {
         return range(0, qubitCount);
     }
 
-    public int[] range(int start, int end) {
-        return IntStream.range(start + shift, end + shift).toArray();
+    public int[] allButLast() {
+        return range(0, qubitCount - 1);
     }
 
     public IntStream allAsStream() {
         return IntStream.range(shift, shift + qubitCount);
+    }
+
+    public int[] range(int startInclusive, int endExclusive) {
+        return IntStream.range(startInclusive + shift, endExclusive + shift).toArray();
     }
 }

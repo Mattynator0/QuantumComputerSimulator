@@ -5,7 +5,6 @@ import org.example.utils.BinaryPolynomial;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
-import java.util.stream.IntStream;
 
 import static org.example.math.MathUtils.*;
 
@@ -17,18 +16,19 @@ public final class QuantumAlgorithms {
 
     public static QuantumCircuit phaseOracle(int qubitCount, int[] values) {
 
-        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+        QuantumRegister reg = new QuantumRegister(qubitCount);
+        QuantumCircuit qc = new QuantumCircuit(reg);
 
         for (int value : values) {
-            for (int i = 0; i < qubitCount; i++) {
+            for (int i : reg.all()) {
                 if (!isBitSet(value, i)) {
                     qc.x(i);
                 }
             }
 
-            qc.mcp(Math.PI, IntStream.range(0, qubitCount - 1).toArray(), qubitCount - 1);
+            qc.mcp(Math.PI, reg.allButLast(), reg.last());
 
-            for (int i = 0; i < qubitCount; i++) {
+            for (int i : reg.all()) {
                 if (!isBitSet(value, i)) {
                     qc.x(i);
                 }
@@ -40,18 +40,20 @@ public final class QuantumAlgorithms {
 
     public static QuantumCircuit bitOracle(int qubitCount, int[] values) {
 
-        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+        QuantumRegister reg = new QuantumRegister(qubitCount - 1);
+        QuantumRegister bitReg = new QuantumRegister(1);
+        QuantumCircuit qc = new QuantumCircuit(reg, bitReg);
 
         for (int value : values) {
-            for (int i = 0; i < qubitCount - 1; i++) {
+            for (int i : reg.all()) {
                 if (!isBitSet(value, i)) {
                     qc.x(i);
                 }
             }
 
-            qc.mcx(IntStream.range(0, qubitCount - 1).toArray(), qubitCount - 1);
+            qc.mcx(reg.all(), bitReg.first());
 
-            for (int i = 0; i < qubitCount - 1; i++) {
+            for (int i : reg.all()) {
                 if (!isBitSet(value, i)) {
                     qc.x(i);
                 }
@@ -90,7 +92,7 @@ public final class QuantumAlgorithms {
         qc.append(statePrep, targetReg);
 
         // 2. Hadamards on estimation register
-        qc.uniform(estimationReg);
+        qc.h(estimationReg);
 
         // 3. Controlled powers of the unitary operator
         for (int i = 0; i < estimationReg.getQubitCount(); i++) {
@@ -161,8 +163,8 @@ public final class QuantumAlgorithms {
         optimizerState.threshold = 1; // this assumes a positive solution to the polynomial
 
         keyReg.setShift(valueReg.getQubitCount());
-        int valueMask = getMask(valueReg.getFirst(), valueReg.getEnd());
-        int keyMask = getMask(keyReg.getFirst(), keyReg.getEnd());
+        int valueMask = getMask(valueReg.first(), valueReg.end());
+        int keyMask = getMask(keyReg.first(), keyReg.end());
 
         QuantumCircuit statePrep = null;
 

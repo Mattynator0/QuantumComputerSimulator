@@ -9,5 +9,6 @@ public class CircuitAnalyticsDTO {
 
     public int transformations;
     public int controlledOperations;
-    public int complexOperations;
+    public int statevectorOperations;
+    public long executionTimeMillis;
 }
