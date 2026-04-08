@@ -14,5 +14,6 @@ You can construct quantum circuits using quantum register wrappers or through ra
 - Amplitude Estimation
 - Polynomial evaluation
 - Grover optimizer on a polynomial
+- Shor's factorization algorithm
 
 Circuit examples available in `CircuitExamples.java`
