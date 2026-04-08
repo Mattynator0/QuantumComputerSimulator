@@ -1,11 +1,13 @@
 package org.example;
 
-import org.example.simulator.OptimizerState;
+import org.example.math.MathUtils;
+import org.example.simulator.dto.OptimizerState;
 import org.example.simulator.QuantumAlgorithms;
 import org.example.simulator.QuantumCircuit;
 import org.example.simulator.QuantumRegister;
 import org.example.utils.BinaryPolynomial;
 
+import java.util.Random;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
 import java.util.stream.IntStream;
@@ -37,7 +39,7 @@ public class CircuitExamples {
         qc.geometric(fourierBasis * Math.TAU / (1 << qubitCount));
 
         // apply inverse quantum fourier transform
-        qc.iqft(true);
+        qc.iqft(false, true);
 
         return qc;
     }
@@ -128,8 +130,8 @@ public class CircuitExamples {
         // create the stop condition for grover searching
         Function<OptimizerState, Boolean> stopCondition = (o -> o.fails < 10);
 
-        // grover optimizer searches iteratively for larger values of the polynomial
-        // in each iteration it applies the grover operator n times, where n is chosen according to the provided schedule (here [0, 1])
+        // Grover optimizer searches iteratively for larger values of the polynomial
+        // in each iteration it applies the Grover operator n times, where n is chosen according to the provided schedule (here [0, 1])
         int[] schedule = new int[]{0, 1};
 
         QuantumRegister keyReg = new QuantumRegister(keyQubitCount);
@@ -150,5 +152,62 @@ public class CircuitExamples {
         } else {
             return "Balanced";
         }
+    }
+
+
+    /// Carry out search algorithm for finding a factor of N.
+    ///
+    /// @param N                 Integer to be factorized.
+    /// @param numTries          Number of trials.
+    /// @param oneControlCircuit Use order finding circuit with a single control qubit.
+    /// @return Found factor or one if no success.
+    public static int findFactor(int N,
+                                 int numTries,
+                                 boolean oneControlCircuit) {
+
+        // adapted Qiskit code by Benjamin Assel
+        // https://github.com/benjamin-assel/qiskit-shor
+
+        if (N % 2 == 0) {
+            System.out.println("N is even, therefore 2 is a factor.");
+            return 2;
+        }
+
+        int n = (int) Math.ceil(Math.log(N) / Math.log(2));
+        for (int k = 2; k < n; k++) {
+            int d = (int) Math.pow(N, 1.0 / k);
+            if (Math.pow(d, k) == N) {
+                System.out.println("N is a power of a prime, specifically " + d + "^" + k + ".");
+                return d; // N = d^k
+            }
+        }
+
+        Random random = new Random();
+
+        for (int i = 0; i < numTries; i++) {
+            int a = random.nextInt(2, N - 1);
+            System.out.println("Find factor attempt #" + (i + 1) + ", trying a = " + a);
+
+            int d = MathUtils.gcd(a, N);
+            if (d > 1) {
+                System.out.println("Lucky guess, " + d + " is a factor.");
+                return d;
+            }
+
+            int r = QuantumAlgorithms.findOrder(a, N, null, oneControlCircuit);
+            if (r == 0)
+                continue;
+            if (r % 2 == 0) {
+                int x = MathUtils.modPow(a, r/2, N) - 1;
+                d = MathUtils.gcd(x, N);
+                if (d > 1 && d < N) {
+                    System.out.println("Factor found: " + d + ".");
+                    return d;
+                }
+            }
+        }
+
+        System.out.println("Factor not found.");
+        return 1; // no factor found
     }
 }

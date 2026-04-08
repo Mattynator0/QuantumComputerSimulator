@@ -4,6 +4,8 @@ import lombok.Getter;
 import lombok.val;
 import org.example.math.Complex;
 import org.example.math.ComplexMatrix;
+import org.example.simulator.dto.CircuitAnalyticsDTO;
+import org.example.simulator.dto.CircuitStateDetailsDTO;
 import org.knowm.xchart.SwingWrapper;
 import org.knowm.xchart.XYChart;
 import org.knowm.xchart.XYChartBuilder;
@@ -29,7 +31,7 @@ public class QuantumCircuit {
 
     private final Random random = new Random();
 
-    public static final int MAX_QUBITS = 21;
+    public static final int MAX_QUBITS = 20;
 
     @Getter
     private final List<QuantumTransformation> transformations = new ArrayList<>();
@@ -92,6 +94,14 @@ public class QuantumCircuit {
         analyticsDTO.executionTimeMillis = end - start;
     }
 
+    public void reset() {
+        transformations.clear();
+    }
+
+    public int[] all() {
+        return qubits.all();
+    }
+
     @Override
     public QuantumCircuit clone() {
         QuantumCircuit copy = new QuantumCircuit(qubitCount);
@@ -120,8 +130,8 @@ public class QuantumCircuit {
     public void append(QuantumCircuit other, QuantumRegister... regs) {
         IntStream merged = Stream.of(regs).flatMapToInt(QuantumRegister::allAsStream);
 
-        QuantumCircuit shifted = other.remapQubits(merged.toArray());
-        append(shifted, 0);
+        QuantumCircuit remapped = other.remapQubits(merged.toArray());
+        append(remapped, 0);
     }
 
     public void append(QuantumCircuit other, int shift) {
@@ -306,7 +316,7 @@ public class QuantumCircuit {
         StringBuilder builder = new StringBuilder("| ");
         for (int i = 0; i < columnNames.length; i++) {
             builder.append(columnNames[i])
-                    .append(" ".repeat(Math.max(0, maxColumnWidths[i] - columnNames[i].length())))
+                    .repeat(" ", Math.max(0, maxColumnWidths[i] - columnNames[i].length()))
                     .append(" | ");
         }
         System.out.println(builder);
@@ -315,27 +325,29 @@ public class QuantumCircuit {
             builder = new StringBuilder("| ");
             for (int i = 0; i < columnNames.length; i++) {
                 builder.append(details.getString(i))
-                        .append(" ".repeat(Math.max(0, maxColumnWidths[i] - details.getString(i).length())))
+                        .repeat(" ", Math.max(0, maxColumnWidths[i] - details.getString(i).length()))
                         .append(" | ");
             }
             System.out.println(builder);
         }
     }
 
-    /// Prints analytics regarding the quantum circuit in the terminal.
-    /// @apiNote  Some data will be missing if method is called before {@code run()}.
+    /// Prints analytics about the quantum circuit.
+    /// @apiNote  Some data (e.g. execution time) will be missing if called before {@code run()}.
     public void printAnalytics() {
 
         analyticsDTO.transformations = transformations.size();
-        analyticsDTO.controlledOperations = (int) transformations.stream()
+        analyticsDTO.controlledTransformations = (int) transformations.stream()
                 .filter(t -> !t.getControls().isEmpty())
                 .count();
 
         System.out.println(analyticsDTO);
     }
 
+    /// Shows a histogram of statevector probabilities
     public void displayProbabilityChart(int[] targets) {
         // FIXME indexing starts at 1 instead of 0
+        // TODO make this prettier and more informative
         XYChart chart = new XYChartBuilder().build();
         XYSeries series = chart.addSeries("probability", this.getProbabilities(targets));
         series.setXYSeriesRenderStyle(XYSeries.XYSeriesRenderStyle.Scatter);
@@ -537,8 +549,13 @@ public class QuantumCircuit {
 
     public void geometricAlt(double theta) {
         for (int i : qubits.all()) {
-            this.h(i);
             this.phase((1 << qubitCount - 1 - i) * theta, i);
+        }
+    }
+
+    public void geometricAlt(double theta, int[] targets) {
+        for (int i = 0; i < targets.length; i++) {
+            this.phase((1 << targets.length - 1 - i) * theta, targets[i]);
         }
     }
 
@@ -546,7 +563,7 @@ public class QuantumCircuit {
     public void raisedCosine() {
         this.h(qubits.last());
         this.phase(Math.PI * -1, qubits.last());
-        this.qft(false);
+        this.qft(true, false);
     }
 
     public void binomialApprox() {
@@ -559,7 +576,7 @@ public class QuantumCircuit {
         for (int i = 1; i < qubitCount - 1; i++)
             this.cx(0, i);
 
-        this.qft(false);
+        this.qft(true, false);
     }
 
     /** Creates a state with probabilities equal to cos^2(k * pi * freq/2)
@@ -568,7 +585,7 @@ public class QuantumCircuit {
      */
     public void squaredCosine(int frequency) {
         this.initializeWithValues(qubits, new int[] {0, frequency});
-        this.qft(true);
+        this.qft(false, true);
     }
     
     /// Encodes values in the array as a uniform superposition. Expected to run on the identity statevector.
@@ -591,26 +608,26 @@ public class QuantumCircuit {
 
     /// ## ALGORITHMS
     
-    public void qft(boolean swap) {
-        _qft(false, IntStream.range(0, qubitCount).toArray(), swap);
+    public void qft(boolean reverse, boolean swap) {
+        _qft(false, IntStream.range(0, qubitCount).toArray(), reverse, swap);
     }
 
-    public void qft(int[] targets, boolean swap) {
-        _qft(false, targets, swap);
+    public void qft(int[] targets, boolean reverse, boolean swap) {
+        _qft(false, targets, reverse, swap);
     }
 
-    public void iqft(boolean swap) {
-        _qft(true, IntStream.range(0, qubitCount).toArray(), swap);
+    public void iqft(boolean reverse, boolean swap) {
+        _qft(true, IntStream.range(0, qubitCount).toArray(), reverse, swap);
     }
 
-    public void iqft(int[] targets, boolean swap) {
-        _qft(true, targets, swap);
+    public void iqft(int[] targets, boolean reverse, boolean swap) {
+        _qft(true, targets, reverse, swap);
     }
 
-    private void _qft(boolean inverse, int[] targets, boolean swap) {
+    private void _qft(boolean inverse, int[] targets, boolean reverse, boolean swap) {
         int factor = inverse ? -1 : 1;
 
-        if (!swap) {
+        if (reverse) {
             reverseArray(targets);
         }
 
@@ -623,7 +640,11 @@ public class QuantumCircuit {
         }
 
         if (swap)
-            this.mswap(targets);
+            this.reverseWithSwaps(targets);
+
+        if (reverse) {
+            reverseArray(targets); // undo reversing
+        }
     }
 
     public void encodeTerms(double coeff, int[] vars, QuantumRegister keyReg, QuantumRegister valueReg) {
@@ -651,16 +672,6 @@ public class QuantumCircuit {
         this.mcp(Math.PI, qubits.allButLast(), qubits.last());
 
         this.x(qubits.all());
-    }
-
-    public void add(int x) {
-        // TODO figure out if avoiding swaps is possible
-        this.qft(true);
-
-        double theta = x * Math.TAU / (1 << qubitCount);
-        this.geometric(theta);
-
-        this.iqft(true);
     }
 
     /// ## GATES
@@ -762,7 +773,13 @@ public class QuantumCircuit {
         transformations.add(new QuantumTransformation(Gate.H, controlList, target));
     }
 
-    public void mswap(int[] targets) {
+    /// Swaps qubits between listA and listB
+    public void mswap(int[] listA, int[] listB) {
+        for (int i = 0; i < listA.length; i++)
+            this.swap(listA[i], listB[i]);
+    }
+
+    public void reverseWithSwaps(int[] targets) {
         int length = targets.length;
         for (int i = 0; i < length / 2; i++)
             this.swap(targets[i], targets[length - 1 - i]);

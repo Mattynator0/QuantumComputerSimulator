@@ -15,8 +15,7 @@ import java.util.Set;
 import static org.example.math.MathUtils.*;
 import static org.example.simulator.QuantumCircuit.MAX_QUBITS;
 import static org.example.simulator.QuantumTransformationTest.quantumTransformationAssertEquals;
-import static org.example.simulator.TestUtils.assertCloseTo;
-import static org.example.simulator.TestUtils.complexAssertEquals;
+import static org.example.simulator.TestUtils.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class QuantumCircuitTest {
@@ -134,6 +133,7 @@ public class QuantumCircuitTest {
         // FIXME rewrite the assertion logic to get rid of the constraint below
         // generate theta such that no phase is above 180 or below -180 to make the assertions simpler
         double theta = (rand.nextDouble() - 0.5) * Math.TAU / N;
+        qc.uniform();
         qc.geometricAlt(theta);
         qc.run();
 
@@ -228,7 +228,7 @@ public class QuantumCircuitTest {
                 qc.x(i);
         }
 
-        qc.qft(true);
+        qc.qft(false, true);
         qc.run();
 
         QuantumCircuit expected = new QuantumCircuit(qubitCount);
@@ -252,7 +252,7 @@ public class QuantumCircuitTest {
                 qc.x(qubitCount - i - 1);
         }
 
-        qc.qft(false);
+        qc.qft(true, false);
         qc.run();
 
         QuantumCircuit expected = new QuantumCircuit(qubitCount);
@@ -272,8 +272,9 @@ public class QuantumCircuitTest {
 
         int x = 3;
 
+        qc.uniform();
         qc.geometric(x * Math.TAU / N);
-        qc.iqft(true);
+        qc.iqft(false, true);
         qc.run();
 
         QuantumCircuit expected = new QuantumCircuit(qubitCount);
@@ -295,8 +296,9 @@ public class QuantumCircuitTest {
 
         int x = 3;
 
+        qc.uniform();
         qc.geometricAlt(x * Math.TAU / N);
-        qc.iqft(false);
+        qc.iqft(true, false);
         qc.run();
 
         QuantumCircuit expected = new QuantumCircuit(qubitCount);
@@ -308,6 +310,52 @@ public class QuantumCircuitTest {
 
         for (int i = 0; i < N; i++) {
             assertCloseTo(qc.getState()[i].direction().doubleValue(),
+                    expected.getState()[i].direction().doubleValue());
+        }
+    }
+
+    @Test
+    void qft_iqft_equalIdentity_swapFalse() {
+        setUp(3);
+
+        int x = 3;
+
+        qc.uniform();
+        qc.geometricAlt(x * Math.TAU / N);
+        qc.iqft(true, false);
+        qc.qft(false, false);
+        qc.run();
+
+        QuantumCircuit expected = new QuantumCircuit(qubitCount);
+        expected.uniform();
+        expected.geometricAlt(x * Math.TAU / N);
+        expected.run();
+
+        for (int i = 0; i < N; i++) {
+            assertCloseTo(qc.getState()[i].direction().doubleValue(),
+                    expected.getState()[i].direction().doubleValue());
+        }
+    }
+
+    @Test
+    void qft_iqft_equalIdentity_swapTrue() {
+        setUp(3);
+
+        int x = 3;
+
+        qc.uniform();
+        qc.geometricAlt(x * Math.TAU / N);
+        qc.iqft(false, true);
+        qc.qft(false, true);
+        qc.run();
+
+        QuantumCircuit expected = new QuantumCircuit(qubitCount);
+        expected.uniform();
+        expected.geometricAlt(x * Math.TAU / N);
+        expected.run();
+
+        for (int i = 0; i < N; i++) {
+            assertDirection(qc.getState()[i].direction().doubleValue(),
                     expected.getState()[i].direction().doubleValue());
         }
     }

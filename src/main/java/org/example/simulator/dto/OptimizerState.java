@@ -1,4 +1,4 @@
-package org.example.simulator;
+package org.example.simulator.dto;
 
 import lombok.ToString;
 

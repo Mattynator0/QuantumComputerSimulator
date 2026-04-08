@@ -1,4 +1,4 @@
-package org.example.simulator;
+package org.example.simulator.dto;
 
 import lombok.Data;
 import lombok.ToString;
@@ -8,7 +8,7 @@ import lombok.ToString;
 public class CircuitAnalyticsDTO {
 
     public int transformations;
-    public int controlledOperations;
+    public int controlledTransformations;
     public int statevectorOperations;
     public long executionTimeMillis;
 }

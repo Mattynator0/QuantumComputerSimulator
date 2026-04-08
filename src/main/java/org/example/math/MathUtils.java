@@ -1,8 +1,10 @@
 package org.example.math;
 
 import ch.obermuhlner.math.big.BigDecimalMath;
+import org.example.simulator.QuantumRegister;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.function.IntPredicate;
 import java.util.stream.IntStream;
 
@@ -44,6 +46,40 @@ public class MathUtils {
 
     public static int[] arrayFromPredicate(int bits, IntPredicate predicate) {
         return IntStream.range(0, 1 << bits).filter(predicate).toArray();
+    }
+
+    public static int[] mergeArrays(int[]... arrays) {
+        int totalLength = 0;
+        for (int[] array : arrays) {
+            totalLength += array.length;
+        }
+
+        int[] result = new int[totalLength];
+
+        int currentPosition = 0;
+        for (int[] array : arrays) {
+            System.arraycopy(array, 0, result, currentPosition, array.length);
+            currentPosition += array.length;
+        }
+
+        return result;
+    }
+
+    public static int[] mergeArrays(QuantumRegister... regs) {
+        int totalLength = 0;
+        for (QuantumRegister reg : regs) {
+            totalLength += reg.getQubitCount();
+        }
+
+        int[] result = new int[totalLength];
+
+        int currentPosition = 0;
+        for (QuantumRegister reg : regs) {
+            System.arraycopy(reg.all(), 0, result, currentPosition, reg.getQubitCount());
+            currentPosition += reg.getQubitCount();
+        }
+
+        return result;
     }
 
     public static int getMask(int start, int end) {
@@ -90,5 +126,23 @@ public class MathUtils {
     public static int getOptimalGroverIterations(int nQubits, int nGoodResults) {
         double N = 1 << nQubits;
         return (int) Math.floor(Math.PI / 4 * Math.sqrt(N / nGoodResults));
+    }
+
+    public static double log2(double x) {
+        return Math.log(x) / Math.log(2);
+    }
+
+    public static int ceilLog2(double x) {
+        return (int) Math.ceil(log2(x));
+    }
+
+    public static int modPow(int base, int exp, int mod) {
+        return BigInteger.valueOf(base)
+                .modPow(BigInteger.valueOf(exp), BigInteger.valueOf(mod))
+                .intValue();
+    }
+
+    public static int gcd(int a, int b) {
+        return BigInteger.valueOf(a).gcd(BigInteger.valueOf(b)).intValue();
     }
 }
