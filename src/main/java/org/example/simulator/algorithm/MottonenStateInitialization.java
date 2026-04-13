@@ -173,13 +173,16 @@ public class MottonenStateInitialization {
                     thetas[i + j + step] = (a - b) / 2;
                 }
 
-        if (n > 2) {
-            // swap the last two angles to get the correct ordering
-            double temp = thetas[n - 1];
-            thetas[n - 1] = thetas[n - 2];
-            thetas[n - 2] = temp;
+        if (n <= 2)
+            return thetas;
+
+        // reorder according to gray code
+        double[] reordered = new double[thetas.length];
+        int[] gray = MathUtils.grayCode(MathUtils.ceilLog2(n));
+        for (int i = 0; i < thetas.length; i++) {
+            reordered[i] = thetas[gray[i]];
         }
 
-        return thetas;
+        return reordered;
     }
 }

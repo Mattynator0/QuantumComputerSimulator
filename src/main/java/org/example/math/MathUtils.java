@@ -16,7 +16,7 @@ public class MathUtils {
             BigDecimal.ONE.divide(BigDecimalMath.sqrt(BigDecimal.valueOf(2), MC), MC.getPrecision(), MC.getRoundingMode());
 
     public static boolean isBitSet(int num, int n) {
-        return (num & (1 << n)) == 1;
+        return (num & (1 << n)) != 0;
     }
 
     public static int flipBinary(int n, int size) {
