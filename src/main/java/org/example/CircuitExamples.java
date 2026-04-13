@@ -1,6 +1,8 @@
 package org.example;
 
+import org.example.math.Complex;
 import org.example.math.MathUtils;
+import org.example.simulator.algorithm.MottonenStateInitialization;
 import org.example.simulator.dto.OptimizerState;
 import org.example.simulator.QuantumAlgorithms;
 import org.example.simulator.QuantumCircuit;
@@ -209,5 +211,29 @@ public class CircuitExamples {
 
         System.out.println("Factor not found.");
         return 1; // no factor found
+    }
+
+    public static void mottonenStateInitialization() {
+
+        // adapted code from PennyLane's implementation:
+        // https://docs.pennylane.ai/en/stable/_modules/pennylane/templates/state_preparations/mottonen.html#MottonenStatePreparation
+        // which itself is based on:
+        // Möttönen et al. (2004) <https://arxiv.org/abs/quant-ph/0407010>
+
+        int qubitCount = 3;
+        QuantumRegister reg = new QuantumRegister(qubitCount);
+        QuantumCircuit qc = new QuantumCircuit(reg);
+
+        // our desired state is an array of (2 ^ qubitCount) complex numbers
+        Complex[] state = new Complex[]{
+                new Complex(1, 0), new Complex(0, 2),
+                new Complex(3, 0), new Complex(0, 4),
+                new Complex(5, 0), new Complex(0, 6),
+                new Complex(7, 0), new Complex(0, 8),
+        };
+
+        MottonenStateInitialization.perform(qc, reg, state);
+        qc.run();
+        qc.printStateDetailed(); // normalized state above
     }
 }

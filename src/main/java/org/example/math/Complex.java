@@ -49,6 +49,27 @@ public final class Complex {
         );
     }
 
+    public Complex divide(Complex other) {
+        BigDecimal a = this.re;
+        BigDecimal b = this.im;
+        BigDecimal c = other.re;
+        BigDecimal d = other.im;
+
+        BigDecimal denominator = c.multiply(c, MC).add(d.multiply(d, MC), MC);
+
+        if (denominator.equals(BigDecimal.ZERO)) {
+            throw new ArithmeticException("Division by zero complex number.");
+        }
+
+        BigDecimal real = a.multiply(c, MC).add(b.multiply(d, MC), MC).divide(denominator, MC);
+        BigDecimal imag = b.multiply(c, MC).subtract(a.multiply(d, MC), MC).divide(denominator, MC);
+
+        return new Complex(
+                real.stripTrailingZeros(),
+                imag.stripTrailingZeros()
+        );
+    }
+
     public Complex conjugate() {
         return new Complex(re, im.negate());
     }
@@ -77,6 +98,13 @@ public final class Complex {
         return BigDecimalMath.atan2(im, re, MC)
                 .multiply(BigDecimal.valueOf(180)
                         .divide(BigDecimalMath.pi(MC), MC.getPrecision(), MC.getRoundingMode()));
+    }
+
+    public BigDecimal directionRadians() {
+        if (im.equals(BigDecimal.ZERO) && re.equals(BigDecimal.ZERO))
+            return BigDecimal.ZERO;
+
+        return BigDecimalMath.atan2(im, re, MC);
     }
 
     @Override

@@ -1,15 +1,14 @@
 package org.example.simulator;
 
 import lombok.Getter;
+import lombok.Setter;
 import lombok.val;
 import org.example.math.Complex;
 import org.example.math.ComplexMatrix;
+import org.example.simulator.algorithm.MottonenStateInitialization;
 import org.example.simulator.dto.CircuitAnalyticsDTO;
 import org.example.simulator.dto.CircuitStateDetailsDTO;
-import org.knowm.xchart.SwingWrapper;
-import org.knowm.xchart.XYChart;
-import org.knowm.xchart.XYChartBuilder;
-import org.knowm.xchart.XYSeries;
+import org.knowm.xchart.*;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -18,8 +17,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.example.math.BigDecimalMathHelper.*;
-import static org.example.math.MathUtils.isBitSet;
-import static org.example.math.MathUtils.reverseArray;
+import static org.example.math.MathUtils.*;
 
 public class QuantumCircuit {
 
@@ -40,6 +38,10 @@ public class QuantumCircuit {
     private QuantumRegister qubits;
 
     private final CircuitAnalyticsDTO analyticsDTO = new CircuitAnalyticsDTO();
+
+    @Setter
+    @Getter
+    private double globalPhase = 0;
 
     /// ## CONSTRUCTORS
 
@@ -92,14 +94,8 @@ public class QuantumCircuit {
         });
         long end = System.currentTimeMillis();
         analyticsDTO.executionTimeMillis = end - start;
-    }
 
-    public void reset() {
-        transformations.clear();
-    }
-
-    public int[] all() {
-        return qubits.all();
+        this.applyGlobalPhase();
     }
 
     @Override
@@ -333,7 +329,8 @@ public class QuantumCircuit {
     }
 
     /// Prints analytics about the quantum circuit.
-    /// @apiNote  Some data (e.g. execution time) will be missing if called before {@code run()}.
+    ///
+    /// @apiNote Some data (e.g. execution time) will be missing if called before {@code run()}.
     public void printAnalytics() {
 
         analyticsDTO.transformations = transformations.size();
@@ -402,55 +399,6 @@ public class QuantumCircuit {
         state[k1] = x.multiply(gateMatrix.get(1, 0)).add(y.multiply(gateMatrix.get(1, 1)));
     }
 
-    private void initializerTree(int level, int branchValue, QuantumRegister reg, List<Integer> valuesToEncode) {
-
-        if (level >= qubitCount)
-            return;
-
-        List<Integer> zeros = new ArrayList<>();
-        List<Integer> ones = new ArrayList<>();
-        int mask = 1 << level;
-
-        for (int v : valuesToEncode) {
-            if ((v & mask) == 0)
-                zeros.add(v);
-            else
-                ones.add(v);
-        }
-
-        // case 1: only zeros on this qubit
-        if (ones.isEmpty()) {
-            initializerTree(level + 1, branchValue, reg, zeros);
-        }
-        // case 2: only ones on this qubit
-        else if (zeros.isEmpty()) {
-            for (int i = 0; i < level; i++) {
-                if (!isBitSet(branchValue, i))
-                    this.x(reg.get(i));
-            }
-            this.mcx(reg.range(0, level), reg.get(level));
-            for (int i = 0; i < level; i++) {
-                if (!isBitSet(branchValue, i))
-                    this.x(reg.get(i));
-            }
-
-            initializerTree(level + 1, branchValue + mask, reg, ones);
-        }
-        // case 3: mix of zeros and ones
-        else {
-            for (int i = 0; i < level; i++) {
-                if (!isBitSet(branchValue, i))
-                    this.x(reg.get(i));
-            }
-            this.mch(reg.range(0, level), reg.get(level));
-            for (int i = 0; i < level; i++) {
-                if (!isBitSet(branchValue, i))
-                    this.x(reg.get(i));
-            }
-            initializerTree(level + 1, branchValue, reg, zeros);
-            initializerTree(level + 1, branchValue + mask, reg, ones);
-        }
-    }
 
     /**
      * @apiNote Calling this after {@code run()} might lead to problems due to the size of the statevector not matching the new qubit count.
@@ -474,7 +422,9 @@ public class QuantumCircuit {
         }
     }
 
-    /** Simple optimizer that removes identity operations. */
+    /**
+     * Simple optimizer that removes identity operations.
+     */
     private void optimizeCircuit() {
         for (int i = 0; i < transformations.size(); i++) {
             QuantumTransformation t = transformations.get(i);
@@ -496,14 +446,19 @@ public class QuantumCircuit {
                     transformations.remove(i);
                     i--;
                     break;
-                }
-                else if (t.getTarget() == other.getTarget()
+                } else if (t.getTarget() == other.getTarget()
                         || other.getControls().contains(t.getTarget())) {
                     break;
                 }
 
                 j++;
             }
+        }
+    }
+
+    private void applyGlobalPhase() {
+        for (int i = 0; i < state.length; i++) {
+            state[i] = state[i].multiply(Complex.cis(BigDecimal.valueOf(-globalPhase)));
         }
     }
 
@@ -579,35 +534,37 @@ public class QuantumCircuit {
         this.qft(true, false);
     }
 
-    /** Creates a state with probabilities equal to cos^2(k * pi * freq/2)
+    /**
+     * Creates a state with probabilities equal to cos^2(k * pi * freq/2)
      *
      * @param frequency frequency of the squared cosine wave
      */
     public void squaredCosine(int frequency) {
-        this.initializeWithValues(qubits, new int[] {0, frequency});
+        this.initializeWithValues(qubits, new int[]{0, frequency});
         this.qft(false, true);
     }
-    
-    /// Encodes values in the array as a uniform superposition. Expected to run on the identity statevector.
+
+    /// Prepares the specified state using CNOTs and RY, RZ gates. Expected to run on the identity statevector.
     public void initializeWithValues(QuantumRegister reg, int[] values) {
+        Complex[] state = new Complex[1 << reg.getQubitCount()];
 
-        if (values.length < 1)
-            return;
-
-        if (values.length == 1) {
-            for (int i : qubits.all()) {
-                if (isBitSet(values[0], i))
-                    this.x(reg.get(i));
-            }
-            return;
+        Arrays.fill(state, Complex.ZERO);
+        for (int v : values) {
+            state[v] = Complex.ONE;
         }
 
-        // FIXME this algorithm doesn't initialize the states with uniform amplitudes
-        initializerTree(0, 0, reg, Arrays.stream(values).boxed().toList());
+        MottonenStateInitialization.perform(this, reg, state);
+    }
+
+    /// Prepares the specified state using CNOTs and RY, RZ gates.
+    ///
+    /// Expected to run as the first operation on the circuit (i.e. requires the statevector to be in the |0> state).
+    public void initializeWithState(QuantumRegister reg, Complex[] state) {
+        MottonenStateInitialization.perform(this, reg, state);
     }
 
     /// ## ALGORITHMS
-    
+
     public void qft(boolean reverse, boolean swap) {
         _qft(false, IntStream.range(0, qubitCount).toArray(), reverse, swap);
     }
@@ -771,6 +728,16 @@ public class QuantumCircuit {
     public void mch(int[] controls, int target) {
         List<Integer> controlList = Arrays.stream(controls).boxed().collect(Collectors.toList());
         transformations.add(new QuantumTransformation(Gate.H, controlList, target));
+    }
+
+    public void mcry(double theta, int[] controls, int target) {
+        List<Integer> controlList = Arrays.stream(controls).boxed().collect(Collectors.toList());
+        transformations.add(new QuantumTransformation(Gate.RY(theta), controlList, target));
+    }
+
+    public void mcrz(double theta, int[] controls, int target) {
+        List<Integer> controlList = Arrays.stream(controls).boxed().collect(Collectors.toList());
+        transformations.add(new QuantumTransformation(Gate.RZ(theta), controlList, target));
     }
 
     /// Swaps qubits between listA and listB
