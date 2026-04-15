@@ -1,28 +1,22 @@
 package org.example.math;
 
 import ch.obermuhlner.math.big.BigDecimalMath;
-
 import java.math.BigDecimal;
 
 import static org.example.math.BigDecimalMathHelper.*;
 
-public final class Complex {
-
-    public final BigDecimal re;
-    public final BigDecimal im;
+public record Complex(BigDecimal re, BigDecimal im) {
 
     public static final Complex ZERO = new Complex(0, 0);
     public static final Complex ONE = new Complex(1, 0);
     public static final Complex I = new Complex(0, 1);
 
     public Complex(double re, double im) {
-        this.re = clampToZero(BigDecimal.valueOf(re).round(MC));
-        this.im = clampToZero(BigDecimal.valueOf(im).round(MC));
+        this(clampToZero(BigDecimal.valueOf(re).round(MC)), clampToZero(BigDecimal.valueOf(im).round(MC)));
     }
 
     public Complex(double re) {
-        this.re = clampToZero(BigDecimal.valueOf(re).round(MC));
-        this.im = BigDecimal.ZERO;
+        this(clampToZero(BigDecimal.valueOf(re).round(MC)), BigDecimal.ZERO);
     }
 
     public Complex(BigDecimal re, BigDecimal im) {
@@ -31,8 +25,7 @@ public final class Complex {
     }
 
     public Complex(BigDecimal re) {
-        this.re = clampToZero(re);
-        this.im = BigDecimal.ZERO;
+        this(clampToZero(re), BigDecimal.ZERO);
     }
 
     public Complex add(Complex other) {
@@ -109,8 +102,8 @@ public final class Complex {
 
     @Override
     public boolean equals(Object o) {
-        if (o instanceof Complex other) {
-            return this.re.equals(other.re) && this.im.equals(other.im);
+        if (o instanceof Complex(BigDecimal re1, BigDecimal im1)) {
+            return this.re.equals(re1) && this.im.equals(im1);
         }
         return false;
     }
