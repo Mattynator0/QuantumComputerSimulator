@@ -86,9 +86,7 @@ public class QuantumCircuit {
             List<Integer> controls = tr.getControls();
             if (controls.isEmpty())
                 this.transform(tr.getGate(), tr.getTarget());
-            else if (controls.size() == 1) {
-                this.cTransform(tr.getGate(), controls.getFirst(), tr.getTarget());
-            } else {
+            else {
                 this.mcTransform(tr.getGate(), controls, tr.getTarget());
             }
         });
@@ -215,7 +213,7 @@ public class QuantumCircuit {
     }
 
     public double[] getProbabilities() {
-        return getProbabilities(IntStream.range(0, qubitCount).toArray());
+        return getProbabilities(qubits.all());
     }
 
     public double[] getProbabilities(int[] targets) {
@@ -284,7 +282,7 @@ public class QuantumCircuit {
             ).replace(' ', '0');
 
             dto.amplitude = c.toString();
-            if (c.im.equals(BigDecimal.ZERO) && c.re.equals(BigDecimal.ZERO))
+            if (c.im().equals(BigDecimal.ZERO) && c.re().equals(BigDecimal.ZERO))
                 dto.direction = "0.0";
             else {
                 dto.direction = zeroIfTiny(c.direction()
@@ -366,11 +364,6 @@ public class QuantumCircuit {
         }
     }
 
-    private void cTransform(Gate gate, int control, int target) {
-
-        mcTransform(gate, List.of(control), target);
-    }
-
     private void mcTransform(Gate gate, List<Integer> controls, int target) {
 
         int targetMask = 1 << target;
@@ -398,7 +391,6 @@ public class QuantumCircuit {
         state[k0] = x.multiply(gateMatrix.get(0, 0)).add(y.multiply(gateMatrix.get(0, 1)));
         state[k1] = x.multiply(gateMatrix.get(1, 0)).add(y.multiply(gateMatrix.get(1, 1)));
     }
-
 
     /**
      * @apiNote Calling this after {@code run()} might lead to problems due to the size of the statevector not matching the new qubit count.

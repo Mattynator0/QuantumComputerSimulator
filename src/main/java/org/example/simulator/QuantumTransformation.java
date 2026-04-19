@@ -9,7 +9,7 @@ import java.util.List;
 public class QuantumTransformation {
 
     private final Gate gate;
-    private final List<Integer> controls;
+    private final List<Integer> controls; // TODO change this to Set<Integer>
     private int target;
     private final double arg;
 

@@ -13,8 +13,8 @@ public final class TestUtils {
 
     public static void complexAssertEquals(Complex expected, Complex actual) {
 
-        assertEquals(expected.re.doubleValue(), actual.re.doubleValue(), delta);
-        assertEquals(expected.im.doubleValue(), actual.im.doubleValue(), delta);
+        assertEquals(expected.re().doubleValue(), actual.re().doubleValue(), delta);
+        assertEquals(expected.im().doubleValue(), actual.im().doubleValue(), delta);
     }
 
     public static void assertCloseTo(double expected, double actual) {
