@@ -28,6 +28,10 @@ public record Complex(BigDecimal re, BigDecimal im) {
         this(clampToZero(re), BigDecimal.ZERO);
     }
 
+    public Complex(Complex complex) {
+        this(complex.re, complex.im);
+    }
+
     public Complex add(Complex other) {
         return new Complex(
                 this.re.add(other.re, MC).stripTrailingZeros(),

@@ -110,7 +110,7 @@ public class CircuitExamples {
         // construct a grover operator that amplifies tagged states (value == 0)
         QuantumCircuit grover = QuantumAlgorithms.grover(statePrep, oracle, 1);
 
-        QuantumCircuit qc = statePrep.clone();
+        QuantumCircuit qc = new QuantumCircuit(statePrep);
         qc.append(grover, 0);
         return qc;
     }

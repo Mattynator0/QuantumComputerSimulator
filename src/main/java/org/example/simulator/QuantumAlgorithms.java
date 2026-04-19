@@ -1,15 +1,12 @@
 package org.example.simulator;
 
-import org.example.math.Complex;
 import org.example.math.MathUtils;
 import org.example.simulator.dto.OptimizerState;
 import org.example.utils.BinaryPolynomial;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
-import java.util.stream.IntStream;
 
 import static org.example.math.MathUtils.*;
 
@@ -179,7 +176,7 @@ public final class QuantumAlgorithms {
                 statePrep = buildPolynomialCircuit(keyReg, valueReg, polynomial);
             }
 
-            QuantumCircuit qc = statePrep.clone();
+            QuantumCircuit qc = new QuantumCircuit(statePrep);
 
             int groverIterations = schedule[optimizerState.iteration % schedule.length];
             qc.append(grover(statePrep, phaseOracle, groverIterations));

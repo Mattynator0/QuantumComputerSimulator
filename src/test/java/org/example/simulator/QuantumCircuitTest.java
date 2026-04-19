@@ -176,25 +176,6 @@ public class QuantumCircuitTest {
     }
 
     @Test
-    void customClone() {
-        setUp(3);
-
-        qc.generateRandomState();
-        qc.mcx(new int[]{0, 2}, 1);
-        qc.cp(12.3, 0, 2);
-
-        QuantumCircuit copy = qc.clone();
-
-        assertNotEquals(qc, copy);
-        assertEquals(qc.getQubitCount(), copy.getQubitCount());
-
-        for (int i = 0; i < qc.getTransformations().size(); i++) {
-            assertNotEquals(qc.getTransformations().get(i), copy.getTransformations().get(i));
-            quantumTransformationAssertEquals(qc.getTransformations().get(i), copy.getTransformations().get(i));
-        }
-    }
-
-    @Test
     void inverse() {
         setUp(3);
 
