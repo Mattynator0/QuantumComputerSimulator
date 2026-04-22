@@ -5,9 +5,11 @@ import lombok.Setter;
 import lombok.val;
 import org.example.math.Complex;
 import org.example.math.ComplexMatrix;
+import org.example.math.MathUtils;
 import org.example.simulator.algorithm.MottonenStateInitialization;
 import org.example.simulator.dto.CircuitAnalyticsDTO;
 import org.example.simulator.dto.CircuitStateDetailsDTO;
+import org.example.utils.Pair;
 import org.knowm.xchart.*;
 
 import java.math.BigDecimal;
@@ -169,14 +171,14 @@ public class QuantumCircuit {
 
     /// ## INFORMATION
 
-    public int[] measure(int samples) {
+    public List<Pair<String, Integer>> measure(int samples) {
         return measure(samples, allQubits);
     }
 
-    public int[] measure(int samples, QuantumRegister reg) {
+    public List<Pair<String, Integer>> measure(int samples, QuantumRegister reg) {
 
         double[] probabilities = this.getProbabilities(reg.all());
-        int[] measurements = new int[1 << qubitCount];
+        Map<String, Integer> measurements = new HashMap<>();
 
         for (int i = 0; i < samples; i++) {
             double rng = random.nextDouble();
@@ -184,12 +186,21 @@ public class QuantumCircuit {
             for (int j = 0; j < probabilities.length; j++) {
                 total += probabilities[j];
                 if (total > rng) {
-                    measurements[j]++;
+                    String m = MathUtils.toBinary(j, reg.getQubitCount());
+                    if (measurements.containsKey(m))
+                        measurements.put(m, measurements.get(m) + 1);
+                    else
+                        measurements.put(m, 1);
                     break;
                 }
             }
         }
-        return measurements;
+
+        return measurements.entrySet()
+                .stream()
+                .map(e -> new Pair<>(e.getKey(), e.getValue()))
+                .sorted(Comparator.comparing((Pair<String, Integer> p) -> p.value()).reversed())
+                .collect(Collectors.toList());
     }
 
     public int measureOnce() {
@@ -265,6 +276,10 @@ public class QuantumCircuit {
     }
 
     public void printStateDetailed() {
+        printStateDetailed(false);
+    }
+
+    public void printStateDetailed(boolean nonZeroOnly) {
         String[] columnNames = {"Outcome", "Binary", "Amplitude", "Direction", "Magnitude", "Probability"};
 
         List<CircuitStateDetailsDTO> detailsList = new ArrayList<>();
@@ -314,6 +329,9 @@ public class QuantumCircuit {
         System.out.println(builder);
 
         for (val details : detailsList) {
+            if (nonZeroOnly && Objects.equals(details.getMagnitude(), "0"))
+                continue;
+
             builder = new StringBuilder("| ");
             for (int i = 0; i < columnNames.length; i++) {
                 builder.append(details.getString(i))
@@ -618,6 +636,20 @@ public class QuantumCircuit {
         this.mcp(Math.PI, allQubits.allButLast(), allQubits.last());
 
         this.x(allQubits.all());
+    }
+
+    /// Adds `x` in Fourier basis controlled on `controls`.
+    public void mcFourierAdd(int[] controls, QuantumRegister reg, int x, boolean isSwapped) {
+        double theta = Math.TAU / (1 << reg.getQubitCount());
+
+        if (isSwapped)
+            for (int i = 0; i < reg.getQubitCount(); i++) {
+                this.mcp((1 << i) * x * theta, controls, reg.get(i));
+            }
+        else
+            for (int i = 0; i < reg.getQubitCount(); i++) {
+                this.mcp((1 << reg.getQubitCount() - 1 - i) * x * theta, controls, reg.get(i));
+            }
     }
 
     /// ## GATES

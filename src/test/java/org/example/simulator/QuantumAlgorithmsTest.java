@@ -4,7 +4,6 @@ import org.example.math.Complex;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
-import java.util.Random;
 import java.util.stream.IntStream;
 
 import static org.example.math.MathUtils.getOptimalGroverIterations;
@@ -14,14 +13,14 @@ public class QuantumAlgorithmsTest {
 
     int qubitCount;
     int N;
+    QuantumRegister reg;
     QuantumCircuit qc;
-
-    Random rand = new Random();
 
     private void setUp(int qubitCount) {
         this.qubitCount = qubitCount;
         N = 1 << qubitCount;
-        qc = new QuantumCircuit(qubitCount);
+        reg = new QuantumRegister(qubitCount);
+        qc = new QuantumCircuit(reg);
     }
 
     private void setUp(QuantumRegister... registers) {
@@ -37,7 +36,7 @@ public class QuantumAlgorithmsTest {
         qc.uniform();
 
         int[] items = new int[]{0, 3, 5};
-        qc.append(QuantumAlgorithms.phaseOracle(qubitCount, items), 0);
+        qc.append(QuantumAlgorithms.phaseOracle(reg, items), 0);
         qc.run();
 
         Complex[] state = qc.getState();
@@ -86,12 +85,11 @@ public class QuantumAlgorithmsTest {
     @Test
     public void grover_oneResult() {
         setUp(3);
-
         QuantumCircuit initialState = new QuantumCircuit(qubitCount);
         initialState.uniform();
 
         int[] goodResults = new int[]{1};
-        QuantumCircuit oracle = QuantumAlgorithms.phaseOracle(qubitCount, goodResults);
+        QuantumCircuit oracle = QuantumAlgorithms.phaseOracle(reg, goodResults);
 
         int iterations = getOptimalGroverIterations(qubitCount, goodResults.length);
 
@@ -117,7 +115,7 @@ public class QuantumAlgorithmsTest {
         initialState.uniform();
 
         int[] goodResults = new int[]{1, 5, 6};
-        QuantumCircuit oracle = QuantumAlgorithms.phaseOracle(qubitCount, goodResults);
+        QuantumCircuit oracle = QuantumAlgorithms.phaseOracle(reg, goodResults);
 
         int iterations = getOptimalGroverIterations(qubitCount, goodResults.length);
 

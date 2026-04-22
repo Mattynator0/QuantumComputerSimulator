@@ -136,6 +136,10 @@ public class MathUtils {
         return (int) Math.ceil(log2(x));
     }
 
+    public static int floorLog2(double x) {
+        return (int) Math.floor(log2(x));
+    }
+
     public static int modPow(int base, int exp, int mod) {
         return BigInteger.valueOf(base)
                 .modPow(BigInteger.valueOf(exp), BigInteger.valueOf(mod))
@@ -151,6 +155,24 @@ public class MathUtils {
         int[] result = new int[n];
         for (int i = 0; i < n; i++) {
             result[i] = i ^ (i >> 1);
+        }
+        return result;
+    }
+
+    public static String toBinary(int x, int bits) {
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < bits; i++) {
+            result.append(x & 1);
+            x >>= 1;
+        }
+        return result.reverse().toString();
+    }
+
+    public static int binaryToInteger(String s) {
+        int result = 0;
+        for (int i = 0; i < s.length(); i++) {
+            result *= 2;
+            result += s.charAt(i) - '0';
         }
         return result;
     }

@@ -4,8 +4,7 @@ import org.example.math.Complex;
 
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
 public final class TestUtils {
 
@@ -46,5 +45,14 @@ public final class TestUtils {
             else
                 assertCloseTo(0, actual[i], delta);
         }
+    }
+
+    @SafeVarargs
+    public static <T> void assertIsIn(T actual, T... expected) {
+        for (T e : expected) {
+            if (actual.equals(e))
+                return;
+        }
+        fail();
     }
 }

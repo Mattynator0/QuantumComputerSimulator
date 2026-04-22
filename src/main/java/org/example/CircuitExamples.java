@@ -21,11 +21,12 @@ public class CircuitExamples {
     public static QuantumCircuit grover(int qubitCount, int[] goodResults) {
 
         // prepare a uniform state (although this implementation also works with other starting states)
-        QuantumCircuit initialState = new QuantumCircuit(qubitCount);
+        QuantumRegister reg = new QuantumRegister(qubitCount);
+        QuantumCircuit initialState = new QuantumCircuit(reg);
         initialState.uniform();
 
         // prepare a phase oracle (flip phase of good outcomes)
-        QuantumCircuit oracle = QuantumAlgorithms.phaseOracle(qubitCount, goodResults);
+        QuantumCircuit oracle = QuantumAlgorithms.phaseOracle(reg, goodResults);
 
         // apply the grover operator iteratively until the amplitudes of good outcomes are maximized
         int iterations = getOptimalGroverIterations(qubitCount, goodResults.length);

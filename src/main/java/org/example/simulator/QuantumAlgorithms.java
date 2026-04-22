@@ -16,23 +16,22 @@ public final class QuantumAlgorithms {
         throw new AssertionError("Cannot instantiate utility class");
     }
 
-    public static QuantumCircuit phaseOracle(int qubitCount, int[] values) {
+    public static QuantumCircuit phaseOracle(QuantumRegister reg, int[] values) {
 
-        QuantumRegister reg = new QuantumRegister(qubitCount);
-        QuantumCircuit qc = new QuantumCircuit(reg);
+        QuantumCircuit qc = new QuantumCircuit(reg.getQubitCount());
 
         for (int value : values) {
-            for (int i : reg.all()) {
+            for (int i = 0; i < qc.getQubitCount(); i++) {
                 if (!isBitSet(value, i)) {
-                    qc.x(i);
+                    qc.x(reg.get(i));
                 }
             }
 
             qc.mcp(Math.PI, reg.allButLast(), reg.last());
 
-            for (int i : reg.all()) {
+            for (int i = 0; i < qc.getQubitCount(); i++) {
                 if (!isBitSet(value, i)) {
-                    qc.x(i);
+                    qc.x(reg.get(i));
                 }
             }
         }
@@ -116,7 +115,7 @@ public final class QuantumAlgorithms {
                                                      int[] goodStates,
                                                      boolean swap) {
 
-        QuantumCircuit phaseOracle = QuantumAlgorithms.phaseOracle(targetReg.getQubitCount(), goodStates);
+        QuantumCircuit phaseOracle = QuantumAlgorithms.phaseOracle(targetReg, goodStates);
 
         QuantumCircuit groverCircuit = QuantumAlgorithms.grover(statePrep, phaseOracle, 1);
 
@@ -205,9 +204,10 @@ public final class QuantumAlgorithms {
     /// Returns a |0> state if predicate is constant, or a non-zero state if the predicate is balanced.
     public static QuantumCircuit deutschJozsa(IntPredicate predicate, int qubitCount) {
 
-        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+        QuantumRegister reg =  new QuantumRegister(qubitCount);
+        QuantumCircuit qc = new QuantumCircuit(reg);
         qc.uniform();
-        qc.append(phaseOracle(qubitCount, arrayFromPredicate(qubitCount, predicate)));
+        qc.append(phaseOracle(reg, arrayFromPredicate(qubitCount, predicate)));
         qc.uniform();
         return qc;
     }

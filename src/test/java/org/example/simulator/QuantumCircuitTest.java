@@ -2,12 +2,14 @@ package org.example.simulator;
 
 import org.example.math.Complex;
 
+import org.example.utils.Pair;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
@@ -346,13 +348,12 @@ public class QuantumCircuitTest {
 
         qc.run();
 
-        int measurementsCount = 100;
-        int[] measurements = qc.measure(measurementsCount);
+        int samples = 100;
+        List<Pair<String, Integer>> measurements = qc.measure(samples);
 
-        assertEquals(measurementsCount, measurements[0]);
-        for (int i = 1; i < measurements.length; i++) {
-            assertEquals(0, measurements[i]);
-        }
+        assertEquals(1, measurements.size());
+        assertEquals("000", measurements.getFirst().key());
+        assertEquals(samples, measurements.getFirst().value());
     }
 
     @Test
@@ -362,15 +363,12 @@ public class QuantumCircuitTest {
         qc.x(1);
         qc.run();
 
-        int measurementsCount = 100;
-        int[] measurements = qc.measure(measurementsCount);
+        int samples = 100;
+        List<Pair<String, Integer>> measurements = qc.measure(samples);
 
-        assertEquals(measurementsCount, measurements[2]);
-        for (int i = 0; i < measurements.length; i++) {
-            if (i == 2)
-                continue;
-            assertEquals(0, measurements[i]);
-        }
+        assertEquals(1, measurements.size());
+        assertEquals("010", measurements.getFirst().key());
+        assertEquals(samples, measurements.getFirst().value());
     }
 
     @Test
@@ -380,16 +378,20 @@ public class QuantumCircuitTest {
         qc.h(0);
         qc.run();
 
-        int measurementsCount = 1000;
-        int expected = measurementsCount / 2;
-        int[] measurements = qc.measure(measurementsCount);
+        int samples = 1000;
+        int expected = samples / 2;
+        List<Pair<String, Integer>> measurements = qc.measure(samples);
 
-        assertCloseTo(expected, measurements[0], 100); // unlikely (9e-11) but possible that the measurement will fall outside the delta
-        assertCloseTo(expected, measurements[1], 100);
+        String key1 = measurements.getFirst().key();
+        String key2 = measurements.get(1).key();
 
-        for (int i = 2; i < measurements.length; i++) {
-            assertEquals(0, measurements[i]);
-        }
+        assertEquals(2, measurements.size());
+        assertIsIn(key1, "000", "001");
+        assertIsIn(key2, "000", "001");
+        assertNotEquals(key1, key2);
+
+        assertCloseTo(expected, measurements.getFirst().value(), 100); // unlikely (P = 9e-11) but possible that the measurement will fall outside the delta
+        assertCloseTo(expected, measurements.get(1).value(), 100);
     }
 
     @Test

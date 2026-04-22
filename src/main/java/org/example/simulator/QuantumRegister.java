@@ -27,7 +27,6 @@ public class QuantumRegister {
     }
 
     public int[] get(int[] indices) {
-
         return Arrays.stream(indices).map(this::get).toArray();
     }
 
