@@ -9,9 +9,10 @@ public class BinaryPolynomial {
 
     List<BinaryPolynomialTerm> terms = new ArrayList<>();
 
+    /// @apiNote `qubits` has to be in ascending order, otherwise the method will treat it as a separate term.
     public void add(double coefficient, List<Integer> qubits) {
         for (var term : terms) {
-            if (term.qubits.equals(qubits)) { // this doesn't compare the elements
+            if (term.qubits.equals(qubits)) {
                 term.coefficient += coefficient;
                 return;
             }

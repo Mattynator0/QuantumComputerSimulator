@@ -1,10 +1,13 @@
 package org.example.simulator;
 
-import org.example.math.MathUtils;
+import org.example.math.Complex;
+import org.example.simulator.algorithm.DiscreteLog;
+import org.example.simulator.algorithm.MottonenStateInitialization;
+import org.example.simulator.algorithm.Oracles;
+import org.example.simulator.algorithm.PolynomialOptimizer;
 import org.example.simulator.dto.OptimizerState;
 import org.example.utils.BinaryPolynomial;
 
-import java.util.List;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
 
@@ -17,51 +20,11 @@ public final class QuantumAlgorithms {
     }
 
     public static QuantumCircuit phaseOracle(QuantumRegister reg, int[] values) {
-
-        QuantumCircuit qc = new QuantumCircuit(reg.getQubitCount());
-
-        for (int value : values) {
-            for (int i = 0; i < qc.getQubitCount(); i++) {
-                if (!isBitSet(value, i)) {
-                    qc.x(reg.get(i));
-                }
-            }
-
-            qc.mcp(Math.PI, reg.allButLast(), reg.last());
-
-            for (int i = 0; i < qc.getQubitCount(); i++) {
-                if (!isBitSet(value, i)) {
-                    qc.x(reg.get(i));
-                }
-            }
-        }
-
-        return qc;
+        return Oracles.phaseOracle(reg, values);
     }
 
     public static QuantumCircuit bitOracle(int qubitCount, int[] values) {
-
-        QuantumRegister reg = new QuantumRegister(qubitCount - 1);
-        QuantumRegister bitReg = new QuantumRegister(1);
-        QuantumCircuit qc = new QuantumCircuit(reg, bitReg);
-
-        for (int value : values) {
-            for (int i : reg.all()) {
-                if (!isBitSet(value, i)) {
-                    qc.x(i);
-                }
-            }
-
-            qc.mcx(reg.all(), bitReg.first());
-
-            for (int i : reg.all()) {
-                if (!isBitSet(value, i)) {
-                    qc.x(i);
-                }
-            }
-        }
-
-        return qc;
+        return Oracles.bitOracle(qubitCount, values);
     }
 
     public static QuantumCircuit grover(QuantumCircuit A, QuantumCircuit phaseOracle, int iterations) {
@@ -126,16 +89,7 @@ public final class QuantumAlgorithms {
                                                         QuantumRegister valueReg,
                                                         BinaryPolynomial polynomial) {
 
-        QuantumCircuit qc = new QuantumCircuit(valueReg, keyReg);
-        qc.uniform();
-
-        for (int i = 0; i < polynomial.getNumberOfTerms(); i++) {
-            qc.encodeTerms(polynomial.getCoefficient(i), polynomial.getQubits(i), keyReg, valueReg);
-        }
-
-        qc.iqft(valueReg.all(), true, false);
-
-        return qc;
+        return PolynomialOptimizer.buildPolynomialCircuit(keyReg, valueReg, polynomial);
     }
 
     /**
@@ -156,49 +110,7 @@ public final class QuantumAlgorithms {
                                                  int[] schedule,
                                                  Function<OptimizerState, Boolean> stopCondition) {
 
-        BinaryPolynomial polynomial = BinaryPolynomial.toBinaryPolynomial(keyReg.getQubitCount(), polynomialTerms);
-
-        OptimizerState optimizerState = new OptimizerState();
-        optimizerState.bestCandidate = -1;
-        optimizerState.bestValue = -1;
-        optimizerState.threshold = 1; // this assumes a positive solution to the polynomial
-
-        keyReg.setShift(valueReg.getQubitCount());
-        int valueMask = getMask(valueReg.first(), valueReg.end());
-        int keyMask = getMask(keyReg.first(), keyReg.end());
-
-        QuantumCircuit statePrep = null;
-
-        do {
-            if (optimizerState.threshold > 0) {
-                polynomial.add(-optimizerState.threshold, List.of());
-                statePrep = buildPolynomialCircuit(keyReg, valueReg, polynomial);
-            }
-
-            QuantumCircuit qc = new QuantumCircuit(statePrep);
-
-            int groverIterations = schedule[optimizerState.iteration % schedule.length];
-            qc.append(grover(statePrep, phaseOracle, groverIterations));
-            optimizerState.iteration++;
-
-            qc.run();
-            int result = qc.measureOnce();
-            int key = (result & keyMask) >> valueReg.getQubitCount();
-            int measuredValue = twosComplementToNegative(result & valueMask, valueReg.getQubitCount());
-            int trueValue = (int) calculatePolynomial(key, polynomialTerms);
-
-            if (trueValue > optimizerState.bestValue) {
-                optimizerState.threshold = measuredValue + 1;
-                optimizerState.bestValue = trueValue;
-                optimizerState.bestCandidate = key;
-            } else {
-                optimizerState.threshold = 0;
-                optimizerState.fails++;
-            }
-
-        } while (stopCondition.apply(optimizerState));
-
-        return optimizerState;
+        return PolynomialOptimizer.groverOptimizer(keyReg, valueReg, polynomialTerms, phaseOracle, schedule, stopCondition);
     }
 
     /// Returns a |0> state if predicate is constant, or a non-zero state if the predicate is balanced.
@@ -210,97 +122,6 @@ public final class QuantumAlgorithms {
         qc.append(phaseOracle(reg, arrayFromPredicate(qubitCount, predicate)));
         qc.uniform();
         return qc;
-    }
-
-
-    /// Build circuit to find the order of A in Z_N, using 4n+2 qubits, with n = ceil(log2(N)).
-    ///
-    /// @param A         int.
-    /// @param N         int.
-    /// @param precision Number of qubits to use for phase estimation. If null, use default value: 2n.
-    /// @return Order finding circuit.
-    private static QuantumCircuit orderFindingCircuit(int A, int N, Integer precision) {
-
-        if (MathUtils.gcd(A, N) > 1)
-            throw new IllegalArgumentException("A and N must be coprime.");
-
-        int n = MathUtils.ceilLog2(N);
-        int m = precision != null
-                ? precision
-                : 2 * n;
-
-        QuantumRegister controlReg = new QuantumRegister(m);
-        QuantumRegister targetReg = new QuantumRegister(n);
-        QuantumRegister ancillaReg = new QuantumRegister(n + 2);
-        QuantumCircuit qc = new QuantumCircuit(controlReg, targetReg, ancillaReg);
-        QuantumArithmetic qa = new QuantumArithmetic(qc);
-
-        // prepare control register in "all quantum integers" state
-        qc.h(controlReg);
-
-        // prepare target register in |1> state
-        qc.x(targetReg.get(1));
-
-        qa.exponentiateModulo(controlReg.all(), targetReg.all(), A, N, ancillaReg.all());
-
-        qc.iqft(false, true);
-        return qc;
-    }
-
-    /// Build circuit to find the order of A in Z_N, using modular multiplication with a single control qubit
-    /// and repeated measurements. The circuit uses 2n + 3 qubits in total, with n = ceil(log2(N)).
-    ///
-    /// @param A         int.
-    /// @param N         int.
-    /// @param precision int. Number of qubits to use for phase estimation. If null, use default value: 2n.
-    /// @return Order finding circuit.
-    private static QuantumCircuit orderFindingCircuitOneControl(int A, int N, Integer precision) {
-
-        if (MathUtils.gcd(A, N) > 1)
-            throw new IllegalArgumentException("A and N must be coprime.");
-
-        int n = MathUtils.ceilLog2(N);
-        int m = precision != null
-                ? precision
-                : 2 * n;
-
-        QuantumRegister controlReg = new QuantumRegister(1);
-        QuantumRegister targetReg = new QuantumRegister(n);
-        QuantumRegister ancillaReg = new QuantumRegister(n + 2);
-        QuantumCircuit qc = new QuantumCircuit(controlReg, targetReg, ancillaReg);
-        QuantumArithmetic qa = new QuantumArithmetic(qc);
-
-        int[] outputReg = new int[m];
-
-        // prepare target register in |1> state
-        qc.x(targetReg.get(1));
-
-        // sequential measurements
-        for (int i = 0; i < m; i++) {
-            qc.h(controlReg);
-
-            int B = MathUtils.modPow(A, 1 << (m - i - 1), N);
-            qa.cMultiplyModulo(controlReg.first(),
-                    targetReg.all(),
-                    ancillaReg.range(0, n),
-                    B,
-                    N,
-                    ancillaReg.get(n),
-                    ancillaReg.get(n + 1),
-                    true,
-                    true);
-
-            for (int j = 0; j < i; j++) {
-                // TODO this algorithm requires measurements during circuit execution
-                // cAppend iqft based on measurements
-            }
-
-            qc.h(controlReg);
-            outputReg[i] = qc.measureOnce(controlReg);
-            // x(controlReg) controlled on the measurement result
-        }
-
-        return new QuantumCircuit(1);
     }
 
     /// Carry out search algorithm for finding the order of the integer A in Z_N, i.e. the
@@ -316,12 +137,10 @@ public final class QuantumAlgorithms {
     /// @apiNote Currently, the one control circuit is not implemented as it would require an overhaul
     /// of the circuit measurement system. Therefore, please do not use `oneControlCircuit = true`
     public static int findOrder(int A, int N, Integer precision, boolean oneControlCircuit) {
+        return DiscreteLog.findOrder(A, N, precision, oneControlCircuit);
+    }
 
-        QuantumCircuit qc = oneControlCircuit
-                ? orderFindingCircuitOneControl(A, N, precision)
-                : orderFindingCircuit(A, N, precision);
-
-        qc.run();
-        return qc.measureOnce();
+    public static void mottonenStateInitialization(QuantumCircuit qc, QuantumRegister reg, Complex[] state) {
+        MottonenStateInitialization.perform(qc, reg, state);
     }
 }

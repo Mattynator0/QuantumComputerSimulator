@@ -2,7 +2,6 @@ package org.example;
 
 import org.example.math.Complex;
 import org.example.math.MathUtils;
-import org.example.simulator.algorithm.MottonenStateInitialization;
 import org.example.simulator.dto.OptimizerState;
 import org.example.simulator.QuantumAlgorithms;
 import org.example.simulator.QuantumCircuit;
@@ -69,7 +68,7 @@ public class CircuitExamples {
     public static QuantumCircuit amplitudeEstimation(int estimationQubitCount, int targetQubitCount, int[] goodStates) {
 
         // Amplitude estimation gives the combined probability of measuring a good state on circuit A.
-        // It works by applying the grover operator G in place of a uniform transformation in QPE.
+        // It works by applying the Grover operator G in place of a uniform transformation in QPE.
         // The measured result `v` can be converted into probability using p = 1 - sin²(PI * v / N),
 
         // initial state we want to measure
@@ -88,7 +87,7 @@ public class CircuitExamples {
                                                        BinaryPolynomial polynomial) {
 
         // This method encodes a polynomial as key-value pairs into the key and value registers,
-        // after which it tags zeros of the polynomial and applies the grover operator to amplify these states.
+        // after which it tags zeros of the polynomial and applies the Grover operator to amplify these states.
 
         QuantumRegister keyReg = new QuantumRegister(keyQubitCount);
         QuantumRegister valueReg = new QuantumRegister(valueQubitCount);
@@ -233,7 +232,7 @@ public class CircuitExamples {
                 new Complex(7, 0), new Complex(0, 8),
         };
 
-        MottonenStateInitialization.perform(qc, reg, state);
+        QuantumAlgorithms.mottonenStateInitialization(qc, reg, state);
         qc.run();
         qc.printStateDetailed(); // normalized state above
     }
