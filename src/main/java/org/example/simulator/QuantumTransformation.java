@@ -10,50 +10,64 @@ import java.util.stream.Collectors;
 public class QuantumTransformation {
 
     private final Gate gate;
-    private Set<Integer> controls;
+    private Set<Integer> quantumControls;
+    private final Set<Integer> classicalControls;
     private int target;
     private final double arg;
 
-    public QuantumTransformation(Gate gate, Set<Integer> controls, int target, double arg) {
+    public QuantumTransformation(Gate gate, Set<Integer> quantumControls, Set<Integer> classicalControls, int target, double arg) {
         this.gate = gate;
-        this.controls = controls;
+        this.quantumControls = quantumControls;
+        this.classicalControls = classicalControls;
         this.target = target;
         this.arg = arg;
     }
 
-    public QuantumTransformation(Gate gate, Set<Integer> controls, int target) {
-        this(gate, controls, target, 0);
+    public QuantumTransformation(Gate gate, Set<Integer> quantumControls, int target, double arg) {
+        this(gate, quantumControls, new HashSet<>(), target, arg);
+    }
+
+    public QuantumTransformation(Gate gate, Set<Integer> quantumControls, Set<Integer> classicalControls, int target) {
+        this(gate, quantumControls, classicalControls, target, 0);
+    }
+
+    public QuantumTransformation(Gate gate, Set<Integer> quantumControls, int target) {
+        this(gate, quantumControls, new HashSet<>(), target, 0);
     }
 
     public QuantumTransformation(Gate gate, int target, double arg) {
-        this(gate, new HashSet<>(), target, arg);
+        this(gate, new HashSet<>(), new HashSet<>(), target, arg);
     }
 
     public QuantumTransformation(Gate gate, int target) {
-        this(gate, new HashSet<>(), target, 0);
+        this(gate, new HashSet<>(), new HashSet<>(), target, 0);
     }
 
     public QuantumTransformation(QuantumTransformation other) {
-        this(other.gate, new HashSet<>(other.controls), other.target, other.arg);
+        this(other.gate, new HashSet<>(other.quantumControls), new HashSet<>(other.classicalControls), other.target, other.arg);
     }
 
-    public void addControl(int control) {
-        controls.add(control);
+    public void addQuantumControl(int control) {
+        quantumControls.add(control);
+    }
+
+    public void addClassicalControl(int control) {
+        classicalControls.add(control);
     }
 
     public String toString() {
-        return gate.getName() + " " + arg + " [" + controls.toString() + "] " + target;
+        return gate.getName() + " " + arg + " [" + quantumControls.toString() + "] " + target;
     }
 
     public void shiftQubits(int shift) {
         target += shift;
 
-        controls = controls.stream()
+        quantumControls = quantumControls.stream()
                 .map(c -> c + shift)
                 .collect(Collectors.toSet());
     }
 
     public QuantumTransformation inverse() {
-        return new QuantumTransformation(gate.inverse(), new HashSet<>(controls), target, -arg);
+        return new QuantumTransformation(gate.inverse(), new HashSet<>(quantumControls), new HashSet<>(classicalControls), target, -arg);
     }
 }

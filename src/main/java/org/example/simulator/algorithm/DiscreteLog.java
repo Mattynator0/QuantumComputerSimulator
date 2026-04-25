@@ -3,7 +3,8 @@ package org.example.simulator.algorithm;
 import org.example.math.MathUtils;
 import org.example.simulator.QuantumArithmetic;
 import org.example.simulator.QuantumCircuit;
-import org.example.simulator.QuantumRegister;
+import org.example.simulator.register.ClassicalRegister;
+import org.example.simulator.register.QuantumRegister;
 
 public class DiscreteLog {
 
@@ -61,20 +62,22 @@ public class DiscreteLog {
         QuantumRegister controlReg = new QuantumRegister(1);
         QuantumRegister targetReg = new QuantumRegister(n);
         QuantumRegister ancillaReg = new QuantumRegister(n + 2);
+        ClassicalRegister outputReg = new ClassicalRegister(m);
+
         QuantumCircuit qc = new QuantumCircuit(controlReg, targetReg, ancillaReg);
+        qc.appendClassicalRegisters(outputReg);
         QuantumArithmetic qa = new QuantumArithmetic(qc);
 
-        int[] outputReg = new int[m];
-
         // prepare target register in |1> state
-        qc.x(targetReg.get(1));
+        qc.x(targetReg.get(0));
 
         // sequential measurements
+        int cBit = controlReg.first();
         for (int i = 0; i < m; i++) {
-            qc.h(controlReg);
+            qc.h(cBit);
 
             int B = MathUtils.modPow(A, 1 << (m - i - 1), N);
-            qa.cMultiplyModulo(controlReg.first(),
+            qa.cMultiplyModulo(cBit,
                     targetReg.all(),
                     ancillaReg.range(0, n),
                     B,
@@ -85,16 +88,19 @@ public class DiscreteLog {
                     true);
 
             for (int j = 0; j < i; j++) {
-                // TODO this algorithm requires measurements during circuit execution
-                // cAppend iqft based on measurements
+                qc.ccp(-Math.PI / Math.pow(2, (i - j)), outputReg.get(j), cBit);
             }
 
-            qc.h(controlReg);
-            outputReg[i] = qc.measureOnce(controlReg);
-            // x(controlReg) controlled on the measurement result
+            qc.h(cBit);
+
+            // measurement
+            qc.measureTransformation(i, cBit);
+
+            // reset
+            qc.ccx(outputReg.get(i), cBit);
         }
 
-        return new QuantumCircuit(1);
+        return qc;
     }
 
     /// Carry out search algorithm for finding the order of the integer A in Z_N, i.e. the

@@ -1,7 +1,7 @@
 package org.example.math;
 
 import ch.obermuhlner.math.big.BigDecimalMath;
-import org.example.simulator.QuantumRegister;
+import org.example.simulator.register.QuantumRegister;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -175,5 +175,26 @@ public class MathUtils {
             result += s.charAt(i) - '0';
         }
         return result;
+    }
+
+    public static void normalizeState(Complex[] state) {
+
+        double normSquared = 0.0;
+
+        // 1. compute sum of |a_i|^2
+        for (Complex c : state) {
+            normSquared += c.absSquared().doubleValue();
+        }
+
+        if (normSquared == 0.0) {
+            throw new IllegalArgumentException("Cannot normalize zero state vector.");
+        }
+
+        double norm = Math.sqrt(normSquared);
+
+        // 2. divide each amplitude by norm
+        for (int i = 0; i < state.length; i++) {
+            state[i] = state[i].divide(new Complex(norm, 0));
+        }
     }
 }

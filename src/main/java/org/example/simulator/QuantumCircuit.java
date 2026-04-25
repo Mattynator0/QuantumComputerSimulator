@@ -9,6 +9,8 @@ import org.example.math.MathUtils;
 import org.example.simulator.algorithm.MottonenStateInitialization;
 import org.example.simulator.dto.CircuitAnalyticsDTO;
 import org.example.simulator.dto.CircuitStateDetailsDTO;
+import org.example.simulator.register.ClassicalRegister;
+import org.example.simulator.register.QuantumRegister;
 import org.example.utils.Pair;
 import org.knowm.xchart.*;
 
@@ -28,6 +30,9 @@ public class QuantumCircuit {
 
     @Getter
     private Complex[] state;
+
+    @Getter
+    private boolean[] classicalRegisters = new boolean[0];
 
     private final Random random = new Random();
 
@@ -92,26 +97,48 @@ public class QuantumCircuit {
                 this.state[i] = new Complex(other.state[i]);
         }
 
-        allQubits = new QuantumRegister(other.qubitCount);
+        this.allQubits = new QuantumRegister(other.qubitCount);
+        this.lastAppliedTransformation = other.lastAppliedTransformation;
+        this.classicalRegisters = other.classicalRegisters;
     }
 
     /// ## API
 
+    private int lastAppliedTransformation = 0;
     public void run() {
+        if (this.lastAppliedTransformation == 0)
+            this.prepareIdentityState();
         this.optimizeCircuit();
-        this.prepareIdentityState();
 
         long start = System.currentTimeMillis();
-        transformations.forEach(tr -> {
-            Set<Integer> controls = tr.getControls();
-            if (controls.isEmpty())
+
+        for (int i = lastAppliedTransformation; i < transformations.size(); i++) {
+            QuantumTransformation tr = transformations.get(i);
+
+            Set<Integer> classicalControls = tr.getClassicalControls();
+            boolean ignoreTransformation = false;
+
+            if (!classicalControls.isEmpty()) {
+                for (int control : classicalControls) {
+                    if (!classicalRegisters[control]) {
+                        ignoreTransformation = true;
+                        break;
+                    }
+                }
+            }
+            if (ignoreTransformation) continue;
+
+            Set<Integer> quantumControls = tr.getQuantumControls();
+            if (quantumControls.isEmpty())
                 this.transform(tr.getGate(), tr.getTarget());
             else {
-                this.mcTransform(tr.getGate(), controls, tr.getTarget());
+                this.mcTransform(tr.getGate(), quantumControls, tr.getTarget());
             }
-        });
+        }
+        lastAppliedTransformation = transformations.size();
+
         long end = System.currentTimeMillis();
-        analyticsDTO.executionTimeMillis = end - start;
+        analyticsDTO.executionTimeMillis += end - start;
 
         this.applyGlobalPhase();
     }
@@ -163,10 +190,24 @@ public class QuantumCircuit {
         otherTransformations.forEach(t -> {
             t.shiftQubits(shift);
             if (control != null)
-                t.addControl(control);
+                t.addQuantumControl(control);
         });
 
         this.transformations.addAll(otherTransformations);
+    }
+    
+    public void appendClassicalRegisters(ClassicalRegister... cRegs) {
+        
+        int totalLength = classicalRegisters.length;
+        
+        for (var cReg : cRegs) {
+            cReg.setShift(totalLength);
+            totalLength += cReg.getBitCount();
+        }
+
+        boolean[] newArray = new boolean[totalLength];
+        System.arraycopy(classicalRegisters, 0, newArray, 0, classicalRegisters.length);
+        classicalRegisters = newArray;
     }
 
     /// ## INFORMATION
@@ -347,9 +388,10 @@ public class QuantumCircuit {
     /// @apiNote Some data (e.g. execution time) will be missing if called before {@code run()}.
     public void printAnalytics() {
 
+        analyticsDTO.qubitCount = qubitCount;
         analyticsDTO.transformations = transformations.size();
         analyticsDTO.controlledTransformations = (int) transformations.stream()
-                .filter(t -> !t.getControls().isEmpty())
+                .filter(t -> !t.getQuantumControls().isEmpty())
                 .count();
 
         System.out.println(analyticsDTO);
@@ -438,7 +480,7 @@ public class QuantumCircuit {
             QuantumTransformation t = transformations.get(i);
 
             // TODO include controlled transformations
-            if (!t.getControls().isEmpty())
+            if (!t.getQuantumControls().isEmpty())
                 continue;
 
             int j = i + 1;
@@ -446,7 +488,7 @@ public class QuantumCircuit {
                 QuantumTransformation other = transformations.get(j);
 
                 if (t.getGate().equals(other.getGate())
-                        && other.getControls().isEmpty()
+                        && other.getQuantumControls().isEmpty()
                         && t.getTarget() == other.getTarget()
                         && t.getArg() == -other.getArg()) {
 
@@ -455,7 +497,7 @@ public class QuantumCircuit {
                     i--;
                     break;
                 } else if (t.getTarget() == other.getTarget()
-                        || other.getControls().contains(t.getTarget())) {
+                        || other.getQuantumControls().contains(t.getTarget())) {
                     break;
                 }
 
@@ -477,7 +519,7 @@ public class QuantumCircuit {
         transformations.forEach(t -> remapped.transformations
                 .add(new QuantumTransformation(
                         t.getGate(),
-                        t.getControls().stream().map(i -> newIndices[i]).collect(Collectors.toSet()),
+                        t.getQuantumControls().stream().map(i -> newIndices[i]).collect(Collectors.toSet()),
                         newIndices[t.getTarget()],
                         t.getArg()
                 )));
@@ -716,6 +758,10 @@ public class QuantumCircuit {
         cx(targetA, targetB);
     }
 
+    /// c - (quantum) controlled
+    /// mc - (quantum) multi-controlled
+    /// cc - classically controlled
+
     public void cx(int control, int target) {
         transformations.add(new QuantumTransformation(Gate.X, new HashSet<>(List.of(control)), target));
     }
@@ -771,5 +817,30 @@ public class QuantumCircuit {
         int length = targets.length;
         for (int i = 0; i < length / 2; i++)
             this.swap(targets[i], targets[length - 1 - i]);
+    }
+
+    public void measureTransformation(int qIndex, int cIndex) {
+        this.run();
+        double[] probs = this.getProbabilities(new int[]{qIndex});
+
+        boolean result = random.nextDouble() > probs[0];
+        classicalRegisters[cIndex] = result;
+
+        int mask = 1 << qIndex;
+        int r = result ? 1 << qIndex : 0;
+        for (int i = 0; i < state.length; i++) {
+            if ((i & mask) != r)
+                state[i] = Complex.ZERO;
+        }
+
+        normalizeState(state);
+    }
+
+    public void ccx(int control, int target) {
+        transformations.add(new QuantumTransformation(Gate.X, new HashSet<>(), new HashSet<>(List.of(control)), target));
+    }
+
+    public void ccp(double theta, int control, int target) {
+        transformations.add(new QuantumTransformation(Gate.PHASE(theta), new HashSet<>(), new HashSet<>(List.of(control)), target, theta));
     }
 }

@@ -1,14 +1,23 @@
 package org.example.simulator.dto;
 
 import lombok.Data;
-import lombok.ToString;
 
 @Data
-@ToString
 public class CircuitAnalyticsDTO {
 
+    public int qubitCount;
     public int transformations;
     public int controlledTransformations;
     public int statevectorOperations;
     public long executionTimeMillis;
+
+    @Override
+    public String toString() {
+        return "------------ Circuit analytics: ------------\n" +
+                "Qubit count:                   " + qubitCount + "\n" +
+                "Transformations:               " + transformations + "\n" +
+                "Controlled transformations:    " + controlledTransformations + "\n" +
+                "Statevector operations:        " + statevectorOperations + "\n" +
+                "Execution time (ms):           " + executionTimeMillis;
+    }
 }

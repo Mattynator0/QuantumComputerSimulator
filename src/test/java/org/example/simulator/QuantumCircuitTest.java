@@ -2,6 +2,7 @@ package org.example.simulator;
 
 import org.example.math.Complex;
 
+import org.example.simulator.register.QuantumRegister;
 import org.example.utils.Pair;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -476,17 +477,17 @@ public class QuantumCircuitTest {
 
         QuantumTransformation qtFirst = other.getTransformations().getFirst();
         assertNotEquals(qtFirst, qc.getTransformations().getFirst());
-        assertTrue(qtFirst.getControls().contains(1));
+        assertTrue(qtFirst.getQuantumControls().contains(1));
         assertEquals(2, qtFirst.getTarget());
 
         QuantumTransformation qtSecond = other.getTransformations().get(1);
         assertNotEquals(qtSecond, qc.getTransformations().get(1));
-        assertTrue(qtSecond.getControls().containsAll(Set.of(1, 3)));
+        assertTrue(qtSecond.getQuantumControls().containsAll(Set.of(1, 3)));
         assertEquals(2, qtSecond.getTarget());
 
         QuantumTransformation qtThird = other.getTransformations().get(2);
         assertNotEquals(qtThird, qc.getTransformations().get(2));
-        assertTrue(qtThird.getControls().isEmpty());
+        assertTrue(qtThird.getQuantumControls().isEmpty());
         assertEquals(3, qtThird.getTarget());
     }
 
@@ -503,17 +504,17 @@ public class QuantumCircuitTest {
 
         QuantumTransformation qtFirst = other.getTransformations().getFirst();
         assertNotEquals(qtFirst, qc.getTransformations().getFirst());
-        assertTrue(qtFirst.getControls().containsAll(Set.of(0, 1)));
+        assertTrue(qtFirst.getQuantumControls().containsAll(Set.of(0, 1)));
         assertEquals(2, qtFirst.getTarget());
 
         QuantumTransformation qtSecond = other.getTransformations().get(1);
         assertNotEquals(qtSecond, qc.getTransformations().get(1));
-        assertTrue(qtSecond.getControls().containsAll(Set.of(0, 1, 3)));
+        assertTrue(qtSecond.getQuantumControls().containsAll(Set.of(0, 1, 3)));
         assertEquals(2, qtSecond.getTarget());
 
         QuantumTransformation qtThird = other.getTransformations().get(2);
         assertNotEquals(qtThird, qc.getTransformations().get(2));
-        assertTrue(qtThird.getControls().contains(0));
+        assertTrue(qtThird.getQuantumControls().contains(0));
         assertEquals(3, qtThird.getTarget());
     }
 

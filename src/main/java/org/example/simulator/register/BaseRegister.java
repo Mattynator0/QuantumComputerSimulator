@@ -1,4 +1,4 @@
-package org.example.simulator;
+package org.example.simulator.register;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -7,23 +7,23 @@ import java.util.Arrays;
 import java.util.stream.IntStream;
 
 @Getter
-public class QuantumRegister {
+abstract class BaseRegister {
 
-    private final int qubitCount;
+    private final int bitCount;
 
     @Setter
     private int shift;
 
-    public QuantumRegister(int qubitCount) {
+    BaseRegister(int bitCount) {
 
-        if (qubitCount <= 0)
-            throw new IllegalArgumentException("Register's qubit count must be > 0");
+        if (bitCount <= 0)
+            throw new IllegalArgumentException("Register's bit count must be > 0");
 
-        this.qubitCount = qubitCount;
+        this.bitCount = bitCount;
     }
 
     public int get(int index) {
-        return (qubitCount + (index % qubitCount)) % qubitCount + shift;
+        return (bitCount + (index % bitCount)) % bitCount + shift;
     }
 
     public int[] get(int[] indices) {
@@ -35,23 +35,23 @@ public class QuantumRegister {
     }
 
     public int last() {
-        return qubitCount - 1 + shift;
+        return bitCount - 1 + shift;
     }
 
     public int end() {
-        return qubitCount + shift;
+        return bitCount + shift;
     }
 
     public int[] all() {
-        return range(0, qubitCount);
+        return range(0, bitCount);
     }
 
     public int[] allButLast() {
-        return range(0, qubitCount - 1);
+        return range(0, bitCount - 1);
     }
 
     public IntStream allAsStream() {
-        return IntStream.range(shift, shift + qubitCount);
+        return IntStream.range(shift, shift + bitCount);
     }
 
     public int[] range(int startInclusive, int endExclusive) {

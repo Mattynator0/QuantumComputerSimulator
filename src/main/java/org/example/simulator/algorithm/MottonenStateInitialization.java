@@ -3,10 +3,12 @@ package org.example.simulator.algorithm;
 import org.example.math.Complex;
 import org.example.math.MathUtils;
 import org.example.simulator.QuantumCircuit;
-import org.example.simulator.QuantumRegister;
+import org.example.simulator.register.QuantumRegister;
 
 import java.util.Arrays;
 import java.util.stream.IntStream;
+
+import static org.example.math.MathUtils.normalizeState;
 
 public class MottonenStateInitialization {
 
@@ -50,27 +52,6 @@ public class MottonenStateInitialization {
         }
         globalPhase /= omegas.length;
         qc.setGlobalPhase(qc.getGlobalPhase() + globalPhase);
-    }
-
-    private static void normalizeState(Complex[] state) {
-
-        double normSquared = 0.0;
-
-        // 1. compute sum of |a_i|^2
-        for (Complex c : state) {
-            normSquared += c.absSquared().doubleValue();
-        }
-
-        if (normSquared == 0.0) {
-            throw new IllegalArgumentException("Cannot normalize zero state vector.");
-        }
-
-        double norm = Math.sqrt(normSquared);
-
-        // 2. divide each amplitude by norm
-        for (int i = 0; i < state.length; i++) {
-            state[i] = state[i].divide(new Complex(norm, 0));
-        }
     }
 
     private static double[] alphaZ(double[] omegas, int n, int k) {

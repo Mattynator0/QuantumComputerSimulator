@@ -6,6 +6,7 @@ import org.example.simulator.algorithm.MottonenStateInitialization;
 import org.example.simulator.algorithm.Oracles;
 import org.example.simulator.algorithm.PolynomialOptimizer;
 import org.example.simulator.dto.OptimizerState;
+import org.example.simulator.register.QuantumRegister;
 import org.example.utils.BinaryPolynomial;
 
 import java.util.function.Function;

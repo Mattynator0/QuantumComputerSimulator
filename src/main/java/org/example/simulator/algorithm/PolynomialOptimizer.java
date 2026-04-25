@@ -1,7 +1,7 @@
 package org.example.simulator.algorithm;
 
 import org.example.simulator.QuantumCircuit;
-import org.example.simulator.QuantumRegister;
+import org.example.simulator.register.QuantumRegister;
 import org.example.simulator.dto.OptimizerState;
 import org.example.utils.BinaryPolynomial;
 

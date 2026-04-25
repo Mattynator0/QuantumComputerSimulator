@@ -1,5 +1,6 @@
 package org.example.simulator;
 
+import org.example.simulator.register.QuantumRegister;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
