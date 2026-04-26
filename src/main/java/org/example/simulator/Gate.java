@@ -3,6 +3,7 @@ package org.example.simulator;
 import ch.obermuhlner.math.big.BigDecimalMath;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.Setter;
 import org.example.math.Complex;
 import org.example.math.ComplexMatrix;
 
@@ -15,24 +16,34 @@ import static org.example.math.MathUtils.INV_SQRT2;
 @EqualsAndHashCode
 public final class Gate {
 
-    private final String name;
-    private final ComplexMatrix matrix;
-    private final double theta;
+    private final GateName name;
 
-    private Gate(String name, ComplexMatrix matrix) {
+    @Setter
+    private ComplexMatrix matrix;
+
+    @Setter
+    private double theta;
+
+    private Gate(GateName name, ComplexMatrix matrix) {
         this.name = name;
         this.matrix = matrix;
         this.theta = 0.0;
     }
 
-    private Gate(String name, ComplexMatrix matrix, double theta) {
+    private Gate(GateName name, ComplexMatrix matrix, double theta) {
         this.name = name;
         this.matrix = matrix;
         this.theta = theta;
     }
 
+    public Gate(Gate other) {
+        this.name = other.getName();
+        this.matrix = new ComplexMatrix(other.getMatrix());
+        this.theta = other.getTheta();
+    }
+
     public static final Gate X = new Gate(
-            "X",
+            GateName.X,
             new ComplexMatrix(new Complex[][]{
                     {Complex.ZERO, Complex.ONE},
                     {Complex.ONE, Complex.ZERO}
@@ -40,7 +51,7 @@ public final class Gate {
     );
 
     public static final Gate Y = new Gate(
-            "Y",
+            GateName.Y,
             new ComplexMatrix(new Complex[][]{
                     {Complex.ZERO, new Complex(0, -1)},
                     {Complex.I, Complex.ZERO}
@@ -48,7 +59,7 @@ public final class Gate {
     );
 
     public static final Gate Z = new Gate(
-            "Z",
+            GateName.Z,
             new ComplexMatrix(new Complex[][]{
                     {Complex.ONE, Complex.ZERO},
                     {Complex.ZERO, new Complex(-1, 0)}
@@ -57,7 +68,7 @@ public final class Gate {
 
 
     public static final Gate H = new Gate(
-            "H",
+            GateName.H,
             new ComplexMatrix(new Complex[][]{
                     {new Complex(INV_SQRT2), new Complex(INV_SQRT2)},
                     {new Complex(INV_SQRT2), new Complex(INV_SQRT2.negate())}
@@ -66,7 +77,7 @@ public final class Gate {
 
     public static Gate PHASE(double theta) {
         return new Gate(
-                "Phase",
+                GateName.PHASE,
                 new ComplexMatrix(new Complex[][]{
                         {Complex.ONE, Complex.ZERO},
                         {Complex.ZERO, Complex.cis(BigDecimal.valueOf(theta))},
@@ -79,7 +90,7 @@ public final class Gate {
         BigDecimal minusHalf = BigDecimal.valueOf(-theta / 2);
 
         return new Gate(
-                "RX",
+                GateName.RX,
                 new ComplexMatrix(new Complex[][]{
                         {new Complex(BigDecimalMath.cos(minusHalf, MC), BigDecimal.ZERO), new Complex(BigDecimal.ZERO, BigDecimalMath.sin(minusHalf, MC))},
                         {new Complex(BigDecimal.ZERO, BigDecimalMath.sin(minusHalf, MC)), new Complex(BigDecimalMath.cos(minusHalf, MC), BigDecimal.ZERO)}
@@ -92,7 +103,7 @@ public final class Gate {
         BigDecimal half = BigDecimal.valueOf(theta / 2);
 
         return new Gate(
-                "RY",
+                GateName.RY,
                 new ComplexMatrix(new Complex[][]{
                         {new Complex(BigDecimalMath.cos(half, MC)), new Complex(BigDecimalMath.sin(half, MC).negate())},
                         {new Complex(BigDecimalMath.sin(half, MC)), new Complex(BigDecimalMath.cos(half, MC))}
@@ -104,7 +115,7 @@ public final class Gate {
     public static Gate RZ(double theta) {
 
         return new Gate(
-                "RZ",
+                GateName.RZ,
                 new ComplexMatrix(new Complex[][]{
                         {Complex.cis(BigDecimal.valueOf(-theta / 2)), Complex.ZERO},
                         {Complex.ZERO, Complex.cis(BigDecimal.valueOf(theta / 2))}
@@ -114,23 +125,12 @@ public final class Gate {
     }
 
     public Gate inverse() {
-        if ("RX".equals(name)) {
-            return Gate.RX(-theta);
-        }
-        if ("RY".equals(name)) {
-            return Gate.RY(-theta);
-        }
-        if ("RZ".equals(name)) {
-            return Gate.RZ(-theta);
-        }
-
-        if (name.equals("X") ||
-                name.equals("Y") ||
-                name.equals("Z") ||
-                name.equals("H")) {
-            return this;
-        }
-
-        return new Gate(name + "†", matrix.adjoint());
+        return switch (name) {
+            case RX -> Gate.RX(-theta);
+            case RY -> Gate.RY(-theta);
+            case RZ -> Gate.RZ(-theta);
+            case PHASE -> Gate.PHASE(-theta);
+            default -> this;
+        };
     }
 }

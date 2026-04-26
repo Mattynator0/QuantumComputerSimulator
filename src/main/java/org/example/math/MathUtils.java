@@ -197,4 +197,8 @@ public class MathUtils {
             state[i] = state[i].divide(new Complex(norm, 0));
         }
     }
+
+    public static boolean isCloseTo(double a, double b) {
+        return Math.abs(a - b) <= BigDecimalMathHelper.EPSILON.doubleValue();
+    }
 }

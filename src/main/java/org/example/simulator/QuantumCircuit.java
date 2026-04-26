@@ -42,6 +42,7 @@ public class QuantumCircuit {
     private final List<QuantumTransformation> transformations = new ArrayList<>();
 
     // full circuit register used solely for its indexing methods
+    @Getter
     private QuantumRegister allQubits;
 
     private final CircuitAnalyticsDTO analyticsDTO = new CircuitAnalyticsDTO();
@@ -98,21 +99,22 @@ public class QuantumCircuit {
         }
 
         this.allQubits = new QuantumRegister(other.qubitCount);
-        this.lastAppliedTransformation = other.lastAppliedTransformation;
+        this.nAppliedTransformations = other.nAppliedTransformations;
         this.classicalRegisters = other.classicalRegisters;
     }
 
     /// ## API
 
-    private int lastAppliedTransformation = 0;
+    private int nAppliedTransformations = 0;
+
     public void run() {
-        if (this.lastAppliedTransformation == 0)
+        if (this.nAppliedTransformations == 0)
             this.prepareIdentityState();
         this.optimizeCircuit();
 
         long start = System.currentTimeMillis();
 
-        for (int i = lastAppliedTransformation; i < transformations.size(); i++) {
+        for (int i = nAppliedTransformations; i < transformations.size(); i++) {
             QuantumTransformation tr = transformations.get(i);
 
             Set<Integer> classicalControls = tr.getClassicalControls();
@@ -135,7 +137,7 @@ public class QuantumCircuit {
                 this.mcTransform(tr.getGate(), quantumControls, tr.getTarget());
             }
         }
-        lastAppliedTransformation = transformations.size();
+        nAppliedTransformations = transformations.size();
 
         long end = System.currentTimeMillis();
         analyticsDTO.executionTimeMillis += end - start;
@@ -195,11 +197,11 @@ public class QuantumCircuit {
 
         this.transformations.addAll(otherTransformations);
     }
-    
+
     public void appendClassicalRegisters(ClassicalRegister... cRegs) {
-        
+
         int totalLength = classicalRegisters.length;
-        
+
         for (var cReg : cRegs) {
             cReg.setShift(totalLength);
             totalLength += cReg.getBitCount();
@@ -473,35 +475,81 @@ public class QuantumCircuit {
     }
 
     /**
-     * Simple optimizer that removes identity operations.
+     * Simple optimizer that removes identity operations and combines rotations.
      */
     private void optimizeCircuit() {
-        for (int i = 0; i < transformations.size(); i++) {
+        for (int i = nAppliedTransformations; i < transformations.size(); i++) {
+            if (i < 0) i = 0;
             QuantumTransformation t = transformations.get(i);
 
-            // TODO include controlled transformations
-            if (!t.getQuantumControls().isEmpty())
-                continue;
+            Set<Integer> left = new HashSet<>(t.getQuantumControls());
+            left.add(t.getTarget());
 
-            int j = i + 1;
-            while (j < transformations.size()) {
+            for (int j = i + 1; j < transformations.size(); j++) {
                 QuantumTransformation other = transformations.get(j);
 
-                if (t.getGate().equals(other.getGate())
-                        && other.getQuantumControls().isEmpty()
-                        && t.getTarget() == other.getTarget()
-                        && t.getArg() == -other.getArg()) {
+                Set<Integer> right = new HashSet<>(other.getQuantumControls());
+                right.add(other.getTarget());
 
-                    transformations.remove(j);
-                    transformations.remove(i);
-                    i--;
-                    break;
-                } else if (t.getTarget() == other.getTarget()
-                        || other.getQuantumControls().contains(t.getTarget())) {
-                    break;
+                // do these transformations depend on different sets of qubits
+                boolean areDisjoint = Collections.disjoint(left, right);
+
+                // if gates are different then go next
+                if (!t.getGate().getName().equals(other.getGate().getName())) {
+                    if (areDisjoint)
+                        continue;
+                    else
+                        break;
                 }
 
-                j++;
+                GateName gateName = t.getGate().getName();
+                boolean combineTransformations;
+
+                // isDiagonal == true should be compared using left.equals(right)
+                // otherwise compare controls and target separately
+                if (gateName.isDiagonal())
+                    combineTransformations = left.equals(right);
+                else
+                    combineTransformations = t.getQuantumControls().equals(other.getQuantumControls())
+                            && t.getTarget() == other.getTarget();
+
+                if (!combineTransformations) {
+                    if (areDisjoint)
+                        continue;
+                    else
+                        break;
+                }
+
+                // isParametrized() == true should have their angles added together (and be removed if result is zero)
+                // otherwise cancel them out immediately
+                if (gateName.isParametrized()) {
+                    t.getGate().setTheta(t.getGate().getTheta() + other.getGate().getTheta());
+                    t.setArg(t.getGate().getTheta());
+
+                    if (isCloseTo(t.getGate().getTheta(), 0)) {
+                        transformations.remove(j);
+                        transformations.remove(i);
+                        i-=2;
+                        break;
+                    }
+
+                    Gate gate = switch (gateName) {
+                        case RX -> Gate.RX(t.getArg());
+                        case RY -> Gate.RY(t.getArg());
+                        case RZ -> Gate.RZ(t.getArg());
+                        case PHASE ->  Gate.PHASE(t.getArg());
+                        default -> throw new IllegalStateException("Gate " + gateName + " is not parametrized.");
+                    };
+                    t.setGate(gate);
+                    transformations.remove(j);
+                    i--;
+                }
+                else {
+                    transformations.remove(j);
+                    transformations.remove(i);
+                    i-=2;
+                }
+                break;
             }
         }
     }

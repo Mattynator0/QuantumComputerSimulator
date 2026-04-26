@@ -1,6 +1,7 @@
 package org.example.simulator;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -9,11 +10,15 @@ import java.util.stream.Collectors;
 @Getter
 public class QuantumTransformation {
 
-    private final Gate gate;
+    @Setter
+    private Gate gate;
+
     private Set<Integer> quantumControls;
     private final Set<Integer> classicalControls;
     private int target;
-    private final double arg;
+
+    @Setter
+    private double arg;
 
     public QuantumTransformation(Gate gate, Set<Integer> quantumControls, Set<Integer> classicalControls, int target, double arg) {
         this.gate = gate;
@@ -44,7 +49,7 @@ public class QuantumTransformation {
     }
 
     public QuantumTransformation(QuantumTransformation other) {
-        this(other.gate, new HashSet<>(other.quantumControls), new HashSet<>(other.classicalControls), other.target, other.arg);
+        this(new Gate(other.gate), new HashSet<>(other.quantumControls), new HashSet<>(other.classicalControls), other.target, other.arg);
     }
 
     public void addQuantumControl(int control) {
