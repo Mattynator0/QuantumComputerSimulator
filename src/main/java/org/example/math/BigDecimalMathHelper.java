@@ -9,8 +9,7 @@ public class BigDecimalMathHelper {
 
     public static final MathContext PRINT_MC = new MathContext(3);
 
-    public static final BigDecimal EPSILON = BigDecimal.ONE
-            .movePointLeft(MC.getPrecision());
+    public static final BigDecimal EPSILON = BigDecimal.ONE.movePointLeft(MC.getPrecision());
 
     public static BigDecimal clampToZero(BigDecimal x) {
         return x.abs().compareTo(EPSILON) < 0 ? BigDecimal.ZERO : x;

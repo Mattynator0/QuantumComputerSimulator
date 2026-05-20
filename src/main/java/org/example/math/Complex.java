@@ -89,16 +89,13 @@ public record Complex(BigDecimal re, BigDecimal im) {
     }
 
     public BigDecimal direction() {
-        if (im.equals(BigDecimal.ZERO) && re.equals(BigDecimal.ZERO))
-            return BigDecimal.ZERO;
-
-        return BigDecimalMath.atan2(im, re, MC)
+        return this.directionRadians()
                 .multiply(BigDecimal.valueOf(180)
                         .divide(BigDecimalMath.pi(MC), MC.getPrecision(), MC.getRoundingMode()));
     }
 
     public BigDecimal directionRadians() {
-        if (im.equals(BigDecimal.ZERO) && re.equals(BigDecimal.ZERO))
+        if (this.equals(Complex.ZERO))
             return BigDecimal.ZERO;
 
         return BigDecimalMath.atan2(im, re, MC);
@@ -107,7 +104,7 @@ public record Complex(BigDecimal re, BigDecimal im) {
     @Override
     public boolean equals(Object o) {
         if (o instanceof Complex(BigDecimal re1, BigDecimal im1)) {
-            return this.re.equals(re1) && this.im.equals(im1);
+            return MathUtils.isCloseTo(re, re1) && MathUtils.isCloseTo(im, im1);
         }
         return false;
     }

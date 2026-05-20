@@ -9,10 +9,14 @@ import org.example.math.MathUtils;
 import org.example.simulator.algorithm.MottonenStateInitialization;
 import org.example.simulator.dto.CircuitAnalyticsDTO;
 import org.example.simulator.dto.CircuitStateDetailsDTO;
+import org.example.simulator.optimizer.DAGCircuitOptimizer;
 import org.example.simulator.register.ClassicalRegister;
 import org.example.simulator.register.QuantumRegister;
 import org.example.utils.Pair;
-import org.knowm.xchart.*;
+import org.knowm.xchart.SwingWrapper;
+import org.knowm.xchart.XYChart;
+import org.knowm.xchart.XYChartBuilder;
+import org.knowm.xchart.XYSeries;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -20,8 +24,10 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static org.example.math.BigDecimalMathHelper.*;
-import static org.example.math.MathUtils.*;
+import static org.example.math.BigDecimalMathHelper.PRINT_MC;
+import static org.example.math.BigDecimalMathHelper.zeroIfTiny;
+import static org.example.math.MathUtils.normalizeState;
+import static org.example.math.MathUtils.reverseArray;
 
 public class QuantumCircuit {
 
@@ -38,8 +44,9 @@ public class QuantumCircuit {
 
     public static final int MAX_QUBITS = 20;
 
+    @Setter
     @Getter
-    private final List<QuantumTransformation> transformations = new ArrayList<>();
+    private List<QuantumTransformation> transformations = new ArrayList<>();
 
     // full circuit register used solely for its indexing methods
     @Getter
@@ -105,12 +112,27 @@ public class QuantumCircuit {
 
     /// ## API
 
+    /// Runs the circuit with optimization enabled by default.
+    ///
+    /// @apiNote To disable optimization, pass `false` as an argument.
+    public void run() {
+        this.run(true);
+    }
+
     private int nAppliedTransformations = 0;
 
-    public void run() {
+    public void run(boolean optimizeCircuit) {
         if (this.nAppliedTransformations == 0)
             this.prepareIdentityState();
-        this.optimizeCircuit();
+
+        if (optimizeCircuit) {
+            long start = System.currentTimeMillis();
+
+            DAGCircuitOptimizer.optimize(this, nAppliedTransformations);
+
+            long end = System.currentTimeMillis();
+            analyticsDTO.optimizationTimeMillis += end - start;
+        }
 
         long start = System.currentTimeMillis();
 
@@ -444,12 +466,9 @@ public class QuantumCircuit {
     }
 
     private void applyGate(int k0, int k1, ComplexMatrix gateMatrix) {
-        Complex x = state[k0];
-        Complex y = state[k1];
-
         analyticsDTO.statevectorOperations++;
-        state[k0] = x.multiply(gateMatrix.get(0, 0)).add(y.multiply(gateMatrix.get(0, 1)));
-        state[k1] = x.multiply(gateMatrix.get(1, 0)).add(y.multiply(gateMatrix.get(1, 1)));
+        state[k0] = state[k0].multiply(gateMatrix.get(0, 0)).add(state[k1].multiply(gateMatrix.get(0, 1)));
+        state[k1] = state[k0].multiply(gateMatrix.get(1, 0)).add(state[k1].multiply(gateMatrix.get(1, 1)));
     }
 
     /**
@@ -474,90 +493,11 @@ public class QuantumCircuit {
         }
     }
 
-    /**
-     * Simple optimizer that removes identity operations and combines rotations.
-     */
-    private void optimizeCircuit() {
-        for (int i = nAppliedTransformations; i < transformations.size(); i++) {
-            if (i < 0) i = 0;
-            QuantumTransformation t = transformations.get(i);
-
-            Set<Integer> left = new HashSet<>(t.getQuantumControls());
-            left.add(t.getTarget());
-
-            for (int j = i + 1; j < transformations.size(); j++) {
-                QuantumTransformation other = transformations.get(j);
-
-                Set<Integer> right = new HashSet<>(other.getQuantumControls());
-                right.add(other.getTarget());
-
-                // do these transformations depend on different sets of qubits
-                boolean areDisjoint = Collections.disjoint(left, right);
-
-                // if gates are different then go next
-                if (!t.getGate().getName().equals(other.getGate().getName())) {
-                    if (areDisjoint)
-                        continue;
-                    else
-                        break;
-                }
-
-                GateName gateName = t.getGate().getName();
-                boolean combineTransformations;
-
-                // isDiagonal == true should be compared using left.equals(right)
-                // otherwise compare controls and target separately
-                if (gateName.isDiagonal())
-                    combineTransformations = left.equals(right);
-                else
-                    combineTransformations = t.getQuantumControls().equals(other.getQuantumControls())
-                            && t.getTarget() == other.getTarget();
-
-                if (!combineTransformations) {
-                    if (areDisjoint)
-                        continue;
-                    else
-                        break;
-                }
-
-                // isParametrized() == true should have their angles added together (and be removed if result is zero)
-                // otherwise cancel them out immediately
-                if (gateName.isParametrized()) {
-                    t.getGate().setTheta(t.getGate().getTheta() + other.getGate().getTheta());
-                    t.setArg(t.getGate().getTheta());
-
-                    if (isCloseTo(t.getGate().getTheta(), 0)) {
-                        transformations.remove(j);
-                        transformations.remove(i);
-                        i-=2;
-                        break;
-                    }
-
-                    Gate gate = switch (gateName) {
-                        case RX -> Gate.RX(t.getArg());
-                        case RY -> Gate.RY(t.getArg());
-                        case RZ -> Gate.RZ(t.getArg());
-                        case PHASE ->  Gate.PHASE(t.getArg());
-                        default -> throw new IllegalStateException("Gate " + gateName + " is not parametrized.");
-                    };
-                    t.setGate(gate);
-                    transformations.remove(j);
-                    i--;
-                }
-                else {
-                    transformations.remove(j);
-                    transformations.remove(i);
-                    i-=2;
-                }
-                break;
-            }
-        }
-    }
-
     private void applyGlobalPhase() {
         for (int i = 0; i < state.length; i++) {
             state[i] = state[i].multiply(Complex.cis(BigDecimal.valueOf(-globalPhase)));
         }
+        globalPhase = 0;
     }
 
     private QuantumCircuit remapQubits(int[] newIndices) {
@@ -745,7 +685,7 @@ public class QuantumCircuit {
     /// ## GATES
 
     public void x(int target) {
-        transformations.add(new QuantumTransformation(Gate.X, target));
+        transformations.add(new QuantumTransformation(Gate.X, target, Math.PI));
     }
 
     public void x(int[] targets) {
@@ -757,11 +697,11 @@ public class QuantumCircuit {
     }
 
     public void y(int target) {
-        transformations.add(new QuantumTransformation(Gate.Y, target));
+        transformations.add(new QuantumTransformation(Gate.Y, target, Math.PI));
     }
 
     public void z(int target) {
-        transformations.add(new QuantumTransformation(Gate.Z, target));
+        transformations.add(new QuantumTransformation(Gate.Z, target, Math.PI));
     }
 
     public void h(int target) {
@@ -811,15 +751,15 @@ public class QuantumCircuit {
     /// cc - classically controlled
 
     public void cx(int control, int target) {
-        transformations.add(new QuantumTransformation(Gate.X, new HashSet<>(List.of(control)), target));
+        transformations.add(new QuantumTransformation(Gate.X, new HashSet<>(List.of(control)), target, Math.PI));
     }
 
     public void cy(int control, int target) {
-        transformations.add(new QuantumTransformation(Gate.Y, new HashSet<>(List.of(control)), target));
+        transformations.add(new QuantumTransformation(Gate.Y, new HashSet<>(List.of(control)), target, Math.PI));
     }
 
     public void cz(int control, int target) {
-        transformations.add(new QuantumTransformation(Gate.Z, new HashSet<>(List.of(control)), target));
+        transformations.add(new QuantumTransformation(Gate.Z, new HashSet<>(List.of(control)), target, Math.PI));
     }
 
     public void cp(double theta, int control, int target) {
@@ -884,10 +824,12 @@ public class QuantumCircuit {
         normalizeState(state);
     }
 
+    /// Classically controlled `X`.
     public void ccx(int control, int target) {
         transformations.add(new QuantumTransformation(Gate.X, new HashSet<>(), new HashSet<>(List.of(control)), target));
     }
 
+    /// Classically controlled `Phase`.
     public void ccp(double theta, int control, int target) {
         transformations.add(new QuantumTransformation(Gate.PHASE(theta), new HashSet<>(), new HashSet<>(List.of(control)), target, theta));
     }

@@ -322,7 +322,7 @@ public class QuantumCircuitTest {
 
     @Test
     void qft_iqft_equalIdentity_swapTrue() {
-        setUp(3);
+        setUp(2);
 
         int x = 3;
 

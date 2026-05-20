@@ -47,7 +47,8 @@ public final class Gate {
             new ComplexMatrix(new Complex[][]{
                     {Complex.ZERO, Complex.ONE},
                     {Complex.ONE, Complex.ZERO}
-            })
+            }),
+            Math.PI
     );
 
     public static final Gate Y = new Gate(
@@ -55,7 +56,8 @@ public final class Gate {
             new ComplexMatrix(new Complex[][]{
                     {Complex.ZERO, new Complex(0, -1)},
                     {Complex.I, Complex.ZERO}
-            })
+            }),
+            Math.PI
     );
 
     public static final Gate Z = new Gate(
@@ -63,7 +65,8 @@ public final class Gate {
             new ComplexMatrix(new Complex[][]{
                     {Complex.ONE, Complex.ZERO},
                     {Complex.ZERO, new Complex(-1, 0)}
-            })
+            }),
+            Math.PI
     );
 
 

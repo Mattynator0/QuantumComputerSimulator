@@ -201,4 +201,8 @@ public class MathUtils {
     public static boolean isCloseTo(double a, double b) {
         return Math.abs(a - b) <= BigDecimalMathHelper.EPSILON.doubleValue();
     }
+
+    public static boolean isCloseTo(BigDecimal a, BigDecimal b) {
+        return a.subtract(b).abs().compareTo(BigDecimalMathHelper.EPSILON) <= 0;
+    }
 }

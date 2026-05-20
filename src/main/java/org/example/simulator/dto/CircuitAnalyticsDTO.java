@@ -9,6 +9,7 @@ public class CircuitAnalyticsDTO {
     public int transformations;
     public int controlledTransformations;
     public int statevectorOperations;
+    public long optimizationTimeMillis;
     public long executionTimeMillis;
 
     @Override
@@ -18,6 +19,7 @@ public class CircuitAnalyticsDTO {
                 "Transformations:               " + transformations + "\n" +
                 "Controlled transformations:    " + controlledTransformations + "\n" +
                 "Statevector operations:        " + statevectorOperations + "\n" +
+                "Optimization time (ms):        " + optimizationTimeMillis + "\n" +
                 "Execution time (ms):           " + executionTimeMillis;
     }
 }

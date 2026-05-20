@@ -10,17 +10,40 @@ public enum GateName {
     RZ,
     PHASE;
 
-    public boolean isParametrized() {
+    /// @return `true` if swapping control and target doesn't affect the outcome
+    public boolean isSymmetric() {
         return switch (this) {
-            case X, Y, Z, H -> false;
-            default -> true;
+            case Z, PHASE -> true;
+            default -> false;
         };
     }
 
-    /// @return `true` if swapping control and target doesn't affect the outcome
     public boolean isDiagonal() {
         return switch (this) {
-            case Z, PHASE -> true;
+            case Z, RZ, PHASE -> true;
+            default -> false;
+        };
+    }
+
+    public String getRotationAxis() {
+        return switch (this) {
+            case X, RX -> "X";
+            case Y, RY -> "Y";
+            case Z, RZ, PHASE -> "Z";
+            default -> "";
+        };
+    }
+
+    public double getPeriod() {
+        return switch (this) {
+            case RX, RY, RZ -> 4 * Math.PI;
+            default -> 2 * Math.PI;
+        };
+    }
+
+    public boolean isRotation() {
+        return switch (this) {
+            case RX, RY, RZ -> true;
             default -> false;
         };
     }
