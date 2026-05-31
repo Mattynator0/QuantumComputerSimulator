@@ -116,7 +116,8 @@ public class QuantumCircuit {
     ///
     /// @apiNote To disable optimization, pass `false` as an argument.
     public void run() {
-        this.run(true);
+        // FIXME optimization is disabled by default until I can make it faster than running without optimization
+        this.run(false);
     }
 
     private int nAppliedTransformations = 0;
@@ -467,8 +468,12 @@ public class QuantumCircuit {
 
     private void applyGate(int k0, int k1, ComplexMatrix gateMatrix) {
         analyticsDTO.statevectorOperations++;
-        state[k0] = state[k0].multiply(gateMatrix.get(0, 0)).add(state[k1].multiply(gateMatrix.get(0, 1)));
-        state[k1] = state[k0].multiply(gateMatrix.get(1, 0)).add(state[k1].multiply(gateMatrix.get(1, 1)));
+
+        Complex c0 = state[k0];
+        Complex c1 = state[k1];
+
+        state[k0] = c0.multiply(gateMatrix.get(0, 0)).add(c1.multiply(gateMatrix.get(0, 1)));
+        state[k1] = c0.multiply(gateMatrix.get(1, 0)).add(c1.multiply(gateMatrix.get(1, 1)));
     }
 
     /**
