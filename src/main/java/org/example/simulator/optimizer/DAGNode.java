@@ -22,6 +22,6 @@ public class DAGNode {
     }
 
     public boolean isRotationGate() {
-        return tr.getGate().getName().isRotation();
+        return tr.getGate().getType().isRotation();
     }
 }

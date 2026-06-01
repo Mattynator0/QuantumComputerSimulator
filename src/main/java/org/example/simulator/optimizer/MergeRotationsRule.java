@@ -46,7 +46,7 @@ class MergeRotationsRule implements RewriteRule {
 
         double totalAngle = nodeAAngle;
         totalAngle += nodeBAngle;
-        totalAngle %= nodeA.tr.getGate().getName().getPeriod();
+        totalAngle %= nodeA.tr.getGate().getType().getPeriod();
 
         dag.removeNode(nodeB);
 
@@ -61,7 +61,7 @@ class MergeRotationsRule implements RewriteRule {
             return;
         }
 
-        Gate gate = OptimizerUtils.getGateByAxis(nodeA.tr.getGate().getName().getRotationAxis(), totalAngle);
+        Gate gate = OptimizerUtils.getGateByAxis(nodeA.tr.getGate().getType().getRotationAxis(), totalAngle);
 
         nodeA.tr.setGate(gate);
         nodeA.tr.setArg(totalAngle);

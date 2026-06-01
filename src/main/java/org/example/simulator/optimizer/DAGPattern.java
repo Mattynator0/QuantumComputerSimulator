@@ -1,21 +1,21 @@
 package org.example.simulator.optimizer;
 
-import org.example.simulator.GateName;
+import org.example.simulator.GateType;
 
 import java.util.*;
 
 class DAGPattern {
 
-    static boolean isGate(DAGNode n, GateName g) {
-        return n.tr.getGate().getName() == g;
+    static boolean isGate(DAGNode n, GateType g) {
+        return n.tr.getGate().getType() == g;
     }
 
     static boolean isDiagonal(DAGNode n) {
-        return n.tr.getGate().getName().isDiagonal();
+        return n.tr.getGate().getType().isDiagonal();
     }
 
     static boolean isSymmetric(DAGNode n) {
-        return n.tr.getGate().getName().isSymmetric();
+        return n.tr.getGate().getType().isSymmetric();
     }
 
     static boolean isSameControlsAndTarget(DAGNode... nodes) {
@@ -70,10 +70,10 @@ class DAGPattern {
     }
 
     static boolean isSameRotationAxis(DAGNode a, DAGNode b) {
-        GateName aGate = a.tr.getGate().getName();
-        GateName bGate = b.tr.getGate().getName();
+        GateType aGate = a.tr.getGate().getType();
+        GateType bGate = b.tr.getGate().getType();
 
-        if (aGate == GateName.H || bGate == GateName.H) return false;
+        if (aGate == GateType.H || bGate == GateType.H) return false;
         return aGate.getRotationAxis().equals(bGate.getRotationAxis());
     }
 
@@ -99,7 +99,7 @@ class DAGPattern {
 
         if (a.tr.getTarget() == b.tr.getTarget()) {
             if (isSameRotationAxis(a, b)) return true;
-            return isGate(a, GateName.H) && isGate(b, GateName.H);
+            return isGate(a, GateType.H) && isGate(b, GateType.H);
         }
 
         boolean bMustBeDiagonal = a.tr.getQuantumControls().contains(b.tr.getTarget());

@@ -89,6 +89,9 @@ public record Complex(BigDecimal re, BigDecimal im) {
     }
 
     public BigDecimal direction() {
+        if (this.equals(Complex.ZERO))
+            return BigDecimal.ZERO;
+
         return this.directionRadians()
                 .multiply(BigDecimal.valueOf(180)
                         .divide(BigDecimalMath.pi(MC), MC.getPrecision(), MC.getRoundingMode()));

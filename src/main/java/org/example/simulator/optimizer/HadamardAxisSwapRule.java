@@ -1,7 +1,7 @@
 package org.example.simulator.optimizer;
 
 import org.example.simulator.Gate;
-import org.example.simulator.GateName;
+import org.example.simulator.GateType;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -25,7 +25,7 @@ class HadamardAxisSwapRule implements RewriteRule {
     public Optional<Match> match(DAGNode node) {
         // for now, it only matches hadamards on one qubit
 
-        if (!DAGPattern.isGate(node, GateName.H))
+        if (!DAGPattern.isGate(node, GateType.H))
             return Optional.empty();
 
         Queue<DAGNode> queue = new LinkedList<>(node.successors);
@@ -33,7 +33,7 @@ class HadamardAxisSwapRule implements RewriteRule {
         while (!queue.isEmpty()) {
             DAGNode succ = queue.poll();
 
-            if (DAGPattern.isGate(succ, GateName.H)
+            if (DAGPattern.isGate(succ, GateType.H)
                     && DAGPattern.isSameControlsAndTarget(node, succ)) {
 
                 List<DAGNode> chain = OptimizerUtils.getSameTargetChain(node, succ);
@@ -56,7 +56,7 @@ class HadamardAxisSwapRule implements RewriteRule {
         for (int i = 1; i < match.nodes.size() - 1; i++) {
             DAGNode n =  match.nodes.get(i);
 
-            if (DAGPattern.isGate(n, GateName.PHASE)) {
+            if (DAGPattern.isGate(n, GateType.PHASE)) {
                 dag.globalPhase -= n.tr.getArg() / 2;
             }
 

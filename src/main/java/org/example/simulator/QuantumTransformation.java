@@ -61,7 +61,7 @@ public class QuantumTransformation {
     }
 
     public String toString() {
-        return gate.getName() + " " + arg + " [" + quantumControls.toString() + "] " + target;
+        return gate.getType() + " " + arg + " [" + quantumControls.toString() + "] " + target;
     }
 
     public void shiftQubits(int shift) {

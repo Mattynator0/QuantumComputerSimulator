@@ -1,6 +1,6 @@
 package org.example.simulator;
 
-public enum GateName {
+public enum GateType {
     X,
     Y,
     Z,
@@ -41,6 +41,7 @@ public enum GateName {
         };
     }
 
+    // PHASE is technically also a rotation but here we only care about RX, RY and RZ
     public boolean isRotation() {
         return switch (this) {
             case RX, RY, RZ -> true;

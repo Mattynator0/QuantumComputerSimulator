@@ -47,7 +47,7 @@ public class OptimizerUtils {
     }
 
     static Gate toHadamardBasis(Gate gate) {
-        return switch (gate.getName()) {
+        return switch (gate.getType()) {
             case X -> Gate.Z;
             case Y -> Gate.Y;
             case Z -> Gate.X;
