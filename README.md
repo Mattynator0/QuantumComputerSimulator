@@ -3,7 +3,7 @@
 Simulates circuits of up to 20 qubits. 
 Feel free to adjust the constant `QuantumCircuit.MAX_QUBITS` but beware that running such a circuit requires an exponential amount of contiguous memory.
 
-You can construct quantum circuits using quantum register wrappers or through raw indexing.
+Please keep in mind that this is an early Work In Progress version of the simulator and you may encounter bugs or API inconsistencies.
 
 ### Currently supported algorithms:
 - Quantum Fourier Transform
@@ -15,5 +15,6 @@ You can construct quantum circuits using quantum register wrappers or through ra
 - Polynomial evaluation
 - Grover optimizer on a polynomial
 - Shor's factorization algorithm
+- Möttönen state initialization
 
-Circuit examples available in `CircuitExamples.java`
+Circuit examples are available in the file `CircuitExamples.java`.
