@@ -1,17 +1,15 @@
 package org.example.simulator.algorithm.qaoa.optimizer;
 
+import lombok.RequiredArgsConstructor;
 import org.example.simulator.algorithm.qaoa.OptimizationResult;
 
 import java.util.Random;
 
+@RequiredArgsConstructor
 public class RandomSearchOptimizer implements ParameterOptimizer {
 
     private final int iterations;
     private final Random random = new Random();
-
-    public RandomSearchOptimizer(int iterations) {
-        this.iterations = iterations;
-    }
 
     @Override
     public OptimizationResult optimize(ObjectiveFunction objective, int depth) {

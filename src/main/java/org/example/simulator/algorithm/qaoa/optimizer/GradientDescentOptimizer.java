@@ -2,15 +2,11 @@ package org.example.simulator.algorithm.qaoa.optimizer;
 
 import org.example.simulator.algorithm.qaoa.OptimizationResult;
 
-import java.util.Random;
-
 public class GradientDescentOptimizer implements ParameterOptimizer {
 
     private final int iterations;
     private final double learningRate;
     private final double epsilon;
-
-    private final Random random = new Random();
 
     public GradientDescentOptimizer(
             int iterations,
