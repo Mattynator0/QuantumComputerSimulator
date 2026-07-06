@@ -229,8 +229,8 @@ public class QuantumArithmeticTest {
         qa.multiplyModulo(xReg.all(), yReg.all(), 9, N, ancilla.first(), ancilla.get(1), true, true);
 
         qc.run();
-        // Expected xReg value = 9*3 mod 5 = 2 = "010"
-        // Expected yReg value = "000"
+        // Expected xReg second = 9*3 mod 5 = 2 = "010"
+        // Expected yReg second = "000"
         // Expected ancilla = "00"
         assertProbs(Map.of(2, 1.), qc.getProbabilities(xReg.all()));
         assertProbs(Map.of(0, 1.), qc.getProbabilities(yReg.all()));
@@ -252,8 +252,8 @@ public class QuantumArithmeticTest {
         qa.multiplyModulo(xReg.all(), yReg.all(), 9, N, ancilla.first(), ancilla.get(1), true, false);
 
         qc.run();
-        // Expected xReg value = "000"
-        // Expected yReg value = 9*3 mod 5 = 2 = "010"
+        // Expected xReg second = "000"
+        // Expected yReg second = 9*3 mod 5 = 2 = "010"
         // Expected ancilla = "00"
         assertProbs(Map.of(0, 1.), qc.getProbabilities(xReg.all()));
         assertProbs(Map.of(2, 1.), qc.getProbabilities(yReg.all()));
@@ -275,8 +275,8 @@ public class QuantumArithmeticTest {
         qa.multiplyModulo(xReg.all(), yReg.all(), 9, N, ancilla.first(), ancilla.get(1), false, true);
 
         qc.run();
-        // Expected xReg value = 9*3 mod 5 = 2 = "010"
-        // Expected yReg value = 3 = "011"
+        // Expected xReg second = 9*3 mod 5 = 2 = "010"
+        // Expected yReg second = 3 = "011"
         // Expected ancilla = "00"
         assertProbs(Map.of(2, 1.), qc.getProbabilities(xReg.all()));
         assertProbs(Map.of(3, 1.), qc.getProbabilities(yReg.all()));
@@ -298,8 +298,8 @@ public class QuantumArithmeticTest {
         qa.multiplyModulo(xReg.all(), yReg.all(), 9, N, ancilla.first(), ancilla.get(1), false, false);
 
         qc.run();
-        // Expected xReg value = 3 = "011"
-        // Expected yReg value = 9*3 mod 5 = 2 = "010"
+        // Expected xReg second = 3 = "011"
+        // Expected yReg second = 9*3 mod 5 = 2 = "010"
         // Expected ancilla = "00"
         assertProbs(Map.of(3, 1.), qc.getProbabilities(xReg.all()));
         assertProbs(Map.of(2, 1.), qc.getProbabilities(yReg.all()));
@@ -323,8 +323,8 @@ public class QuantumArithmeticTest {
         qa.cMultiplyModulo(controlReg.first(), xReg.all(), yReg.all(), 9, N, ancilla.first(), ancilla.get(1), true, true);
 
         qc.run();
-        // Expected xReg value = 9*3 mod 5 = 2 = "010"
-        // Expected yReg value = "000"
+        // Expected xReg second = 9*3 mod 5 = 2 = "010"
+        // Expected yReg second = "000"
         // Expected ancilla = "00"
         assertProbs(Map.of(3, 0.5, 10, 0.5), qc.getProbabilities(MathUtils.mergeArrays(xReg, controlReg)));
         assertProbs(Map.of(0, 0.5, 8, 0.5), qc.getProbabilities(MathUtils.mergeArrays(yReg, controlReg)));
@@ -350,8 +350,8 @@ public class QuantumArithmeticTest {
         qa.exponentiateModulo(xReg.all(), yReg.all(), 2, N, ancilla.all());
         qc.run();
 
-        // Expected xReg value = 4 = "000100"
-        // Expected yReg value = 2^4 * 3 mod 5 = 3 = "011"
+        // Expected xReg second = 4 = "000100"
+        // Expected yReg second = 2^4 * 3 mod 5 = 3 = "011"
         // Expected ancilla = "00000"
         assertProbs(Map.of(4, 1.), qc.getProbabilities(xReg.all()));
         assertProbs(Map.of(3, 1.), qc.getProbabilities(yReg.all()));

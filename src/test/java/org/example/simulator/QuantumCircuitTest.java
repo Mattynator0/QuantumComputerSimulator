@@ -353,8 +353,8 @@ public class QuantumCircuitTest {
         List<Pair<String, Integer>> measurements = qc.measure(samples);
 
         assertEquals(1, measurements.size());
-        assertEquals("000", measurements.getFirst().key());
-        assertEquals(samples, measurements.getFirst().value());
+        assertEquals("000", measurements.getFirst().first());
+        assertEquals(samples, measurements.getFirst().second());
     }
 
     @Test
@@ -368,8 +368,8 @@ public class QuantumCircuitTest {
         List<Pair<String, Integer>> measurements = qc.measure(samples);
 
         assertEquals(1, measurements.size());
-        assertEquals("010", measurements.getFirst().key());
-        assertEquals(samples, measurements.getFirst().value());
+        assertEquals("010", measurements.getFirst().first());
+        assertEquals(samples, measurements.getFirst().second());
     }
 
     @Test
@@ -383,16 +383,16 @@ public class QuantumCircuitTest {
         int expected = samples / 2;
         List<Pair<String, Integer>> measurements = qc.measure(samples);
 
-        String key1 = measurements.getFirst().key();
-        String key2 = measurements.get(1).key();
+        String key1 = measurements.getFirst().first();
+        String key2 = measurements.get(1).first();
 
         assertEquals(2, measurements.size());
         assertIsIn(key1, "000", "001");
         assertIsIn(key2, "000", "001");
         assertNotEquals(key1, key2);
 
-        assertCloseTo(expected, measurements.getFirst().value(), 100); // unlikely (P = 9e-11) but possible that the measurement will fall outside the delta
-        assertCloseTo(expected, measurements.get(1).value(), 100);
+        assertCloseTo(expected, measurements.getFirst().second(), 100); // unlikely (P = 9e-11) but possible that the measurement will fall outside the delta
+        assertCloseTo(expected, measurements.get(1).second(), 100);
     }
 
     @Test

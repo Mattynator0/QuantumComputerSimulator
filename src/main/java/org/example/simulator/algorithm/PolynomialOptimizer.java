@@ -30,12 +30,12 @@ public class PolynomialOptimizer {
     }
 
     /**
-     * Method of finding a polynomial maximum through running a grover algorithm and adjusting the input polynomial.
+     * Method of finding the maximum of a polynomial through running a grover algorithm and adjusting the polynomial.
      *
-     * @param keyReg          key register
-     * @param valueReg        value register
+     * @param keyReg          first register
+     * @param valueReg        second register
      * @param polynomialTerms terms of the polynomial from the lowest term to highest (e.g. x^2 - 3 -> [-3, 0, 1])
-     * @param phaseOracle     phase oracle (usually tags all outputs for which value is greater than zero)
+     * @param phaseOracle     phase oracle (usually tags all outputs for which second is greater than zero)
      * @param schedule        schedule of the Grover operator iterations
      * @param stopCondition   tells the optimizer when to stop (e.g. when number of fails >=10)
      * @return Final state of the optimizer.

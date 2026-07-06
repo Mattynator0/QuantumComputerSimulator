@@ -1,3 +1,3 @@
 package org.example.utils;
 
-public record Pair<K, V>(K key, V value) {}
+public record Pair<K, V>(K first, V second) {}

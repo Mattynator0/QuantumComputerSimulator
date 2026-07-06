@@ -12,7 +12,7 @@ public class DiscreteLog {
     ///
     /// @param A         int.
     /// @param N         int.
-    /// @param precision Number of qubits to use for phase estimation. If null, use default value: 2n.
+    /// @param precision Number of qubits to use for phase estimation. If null, use default second: 2n.
     /// @return Order finding circuit.
     private static QuantumCircuit orderFindingCircuit(int A, int N, Integer precision) {
 
@@ -47,7 +47,7 @@ public class DiscreteLog {
     ///
     /// @param A         int.
     /// @param N         int.
-    /// @param precision int. Number of qubits to use for phase estimation. If null, use default value: 2n.
+    /// @param precision int. Number of qubits to use for phase estimation. If null, use default second: 2n.
     /// @return Order finding circuit.
     private static QuantumCircuit orderFindingCircuitOneControl(int A, int N, Integer precision) {
 
@@ -109,7 +109,7 @@ public class DiscreteLog {
     ///
     /// @param A                 int.
     /// @param N                 int.
-    /// @param precision         Number of qubits to use for phase estimation. If null, use default value: 2*ceil(log2(N)).
+    /// @param precision         Number of qubits to use for phase estimation. If null, use default second: 2*ceil(log2(N)).
     /// @param oneControlCircuit Use order finding circuit with a single control qubit.
     /// @return The first element is the order (if found) or zero (if not).
     ///

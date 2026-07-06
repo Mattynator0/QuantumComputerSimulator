@@ -1,18 +1,19 @@
 package org.example.simulator;
 
 import org.example.math.Complex;
-import org.example.simulator.algorithm.DiscreteLog;
-import org.example.simulator.algorithm.MottonenStateInitialization;
-import org.example.simulator.algorithm.Oracles;
-import org.example.simulator.algorithm.PolynomialOptimizer;
+import org.example.simulator.algorithm.*;
+import org.example.simulator.algorithm.qaoa.OptimizationResult;
 import org.example.simulator.dto.OptimizerState;
 import org.example.simulator.register.QuantumRegister;
 import org.example.utils.BinaryPolynomial;
+import org.example.utils.Pair;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
 
-import static org.example.math.MathUtils.*;
+import static org.example.math.MathUtils.arrayFromPredicate;
 
 public final class QuantumAlgorithms {
 
@@ -96,10 +97,10 @@ public final class QuantumAlgorithms {
     /**
      * Method of finding a polynomial maximum through running a grover algorithm and adjusting the input polynomial.
      *
-     * @param keyReg          key register
-     * @param valueReg        value register
+     * @param keyReg          first register
+     * @param valueReg        second register
      * @param polynomialTerms terms of the polynomial from the lowest term to highest (e.g. x^2 - 3 -> [-3, 0, 1])
-     * @param phaseOracle     phase oracle (usually tags all outputs for which value is greater than zero)
+     * @param phaseOracle     phase oracle (usually tags all outputs for which second is greater than zero)
      * @param schedule        schedule of the Grover operator iterations
      * @param stopCondition   tells the optimizer when to stop (e.g. when number of fails >=10)
      * @return Final state of the optimizer.
@@ -117,7 +118,7 @@ public final class QuantumAlgorithms {
     /// Returns a |0> state if predicate is constant, or a non-zero state if the predicate is balanced.
     public static QuantumCircuit deutschJozsa(IntPredicate predicate, int qubitCount) {
 
-        QuantumRegister reg =  new QuantumRegister(qubitCount);
+        QuantumRegister reg = new QuantumRegister(qubitCount);
         QuantumCircuit qc = new QuantumCircuit(reg);
         qc.uniform();
         qc.append(phaseOracle(reg, arrayFromPredicate(qubitCount, predicate)));
@@ -131,10 +132,9 @@ public final class QuantumAlgorithms {
     ///
     /// @param A                 int.
     /// @param N                 int.
-    /// @param precision         Number of qubits to use for phase estimation. If null, use default value: 2*ceil(log2(N)).
+    /// @param precision         Number of qubits to use for phase estimation. If null, use default second: 2*ceil(log2(N)).
     /// @param oneControlCircuit Use order finding circuit with a single control qubit.
     /// @return The first element is the order (if found) or zero (if not).
-    ///
     /// @apiNote Currently, the one control circuit is not implemented as it would require an overhaul
     /// of the circuit measurement system. Therefore, please do not use `oneControlCircuit = true`
     public static int findOrder(int A, int N, Integer precision, boolean oneControlCircuit) {
@@ -143,5 +143,22 @@ public final class QuantumAlgorithms {
 
     public static void mottonenStateInitialization(QuantumCircuit qc, QuantumRegister reg, Complex[] state) {
         MottonenStateInitialization.perform(qc, reg, state);
+    }
+
+    public static OptimizationResult qaoaMaxCut(int vertexCount,
+                                                List<Pair<Integer, Integer>> edges,
+                                                double[] weights,
+                                                int depth) {
+
+        return QAOA.maxCut(vertexCount, edges, weights, depth);
+    }
+
+    public static OptimizationResult qaoaMaxCut(int vertexCount,
+                                                List<Pair<Integer, Integer>> edges,
+                                                int depth) {
+        double[] weights = new double[edges.size()];
+        Arrays.fill(weights, 1);
+
+        return qaoaMaxCut(vertexCount, edges, weights, depth);
     }
 }

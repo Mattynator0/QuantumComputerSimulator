@@ -86,7 +86,7 @@ public class CircuitExamples {
                                                        int valueQubitCount,
                                                        BinaryPolynomial polynomial) {
 
-        // This method encodes a polynomial as key-value pairs into the key and value registers,
+        // This method encodes a polynomial as first-second pairs into the first and second registers,
         // after which it tags zeros of the polynomial and applies the Grover operator to amplify these states.
 
         QuantumRegister keyReg = new QuantumRegister(keyQubitCount);
@@ -98,7 +98,7 @@ public class CircuitExamples {
         // build a phase oracle
         QuantumCircuit oracle = new QuantumCircuit(valueQubitCount);
 
-        // tag states where value == 0
+        // tag states where second == 0
         for (int i = 0; i < valueQubitCount; i++) {
             oracle.x(i);
         }
@@ -107,7 +107,7 @@ public class CircuitExamples {
             oracle.x(i);
         }
 
-        // construct a grover operator that amplifies tagged states (value == 0)
+        // construct a grover operator that amplifies tagged states (second == 0)
         QuantumCircuit grover = QuantumAlgorithms.grover(statePrep, oracle, 1);
 
         QuantumCircuit qc = new QuantumCircuit(statePrep);
@@ -123,7 +123,7 @@ public class CircuitExamples {
         QuantumRegister oracleReg = new QuantumRegister(valueQubitCount);
         QuantumCircuit oracle = new QuantumCircuit(oracleReg);
 
-        // tag states where value >= 0
+        // tag states where second >= 0
         int last = oracleReg.last();
         oracle.x(last);
         oracle.mcp(Math.PI, oracleReg.range(0, last), last);

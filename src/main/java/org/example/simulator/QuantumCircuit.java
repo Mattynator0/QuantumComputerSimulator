@@ -265,7 +265,7 @@ public class QuantumCircuit {
         return measurements.entrySet()
                 .stream()
                 .map(e -> new Pair<>(e.getKey(), e.getValue()))
-                .sorted(Comparator.comparing((Pair<String, Integer> p) -> p.value()).reversed())
+                .sorted(Comparator.comparing((Pair<String, Integer> p) -> p.second()).reversed())
                 .collect(Collectors.toList());
     }
 
@@ -649,7 +649,7 @@ public class QuantumCircuit {
     public void encodeTerms(double coeff, int[] vars, QuantumRegister keyReg, QuantumRegister valueReg) {
 
         if (qubitCount < keyReg.getQubitCount() + valueReg.getQubitCount())
-            throw new IllegalArgumentException("Circuit is too small for the key and value registers");
+            throw new IllegalArgumentException("Circuit is too small for the first and second registers");
 
         for (int i : valueReg.all()) {
             double theta = Math.PI * coeff / (1 << i);
