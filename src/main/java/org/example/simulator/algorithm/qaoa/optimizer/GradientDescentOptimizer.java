@@ -2,6 +2,7 @@ package org.example.simulator.algorithm.qaoa.optimizer;
 
 import org.example.simulator.algorithm.qaoa.OptimizationResult;
 
+/// This optimizer expects a maximization problem.
 public class GradientDescentOptimizer implements ParameterOptimizer {
 
     private final int iterations;

@@ -161,4 +161,9 @@ public final class QuantumAlgorithms {
 
         return qaoaMaxCut(vertexCount, edges, weights, depth);
     }
+
+    public static OptimizationResult qaoaNumberPartitioning(int[] values,
+                                                            int depth) {
+        return QAOA.numberPartitioning(values, depth);
+    }
 }

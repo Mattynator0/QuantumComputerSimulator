@@ -159,9 +159,9 @@ public class MathUtils {
         return result;
     }
 
-    public static String toBinary(int x, int bits) {
+    public static String toBinaryString(int x, int n_bits) {
         StringBuilder result = new StringBuilder();
-        for (int i = 0; i < bits; i++) {
+        for (int i = 0; i < n_bits; i++) {
             result.append(x & 1);
             x >>= 1;
         }

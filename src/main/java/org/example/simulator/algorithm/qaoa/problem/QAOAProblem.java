@@ -6,7 +6,7 @@ public interface QAOAProblem {
 
     int getQubitCount();
 
-    /// Apply exp(-i * gamma * HC)
+    /// Apply exp(-i * gamma * H_C)
     void applyCostUnitary(QuantumCircuit qc, double gamma);
 
 

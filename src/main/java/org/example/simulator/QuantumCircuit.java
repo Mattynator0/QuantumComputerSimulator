@@ -116,7 +116,7 @@ public class QuantumCircuit {
     ///
     /// @apiNote To disable optimization, pass `false` as an argument.
     public void run() {
-        // FIXME optimization is disabled by default until I can make it faster than running without optimization
+        // FIXME optimization is disabled by default until I can make optimization + runtime faster than just unoptimized runtime
         this.run(false);
     }
 
@@ -252,7 +252,7 @@ public class QuantumCircuit {
             for (int j = 0; j < probabilities.length; j++) {
                 total += probabilities[j];
                 if (total > rng) {
-                    String m = MathUtils.toBinary(j, reg.getQubitCount());
+                    String m = MathUtils.toBinaryString(j, reg.getQubitCount());
                     if (measurements.containsKey(m))
                         measurements.put(m, measurements.get(m) + 1);
                     else
