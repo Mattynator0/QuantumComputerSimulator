@@ -1,112 +1,88 @@
 package org.example.math;
 
-import ch.obermuhlner.math.big.BigDecimalMath;
-import java.math.BigDecimal;
+import java.text.DecimalFormat;
 
-import static org.example.math.BigDecimalMathHelper.*;
+public record Complex(double re, double im) {
 
-public record Complex(BigDecimal re, BigDecimal im) {
-
-    public static final Complex ZERO = new Complex(0, 0);
-    public static final Complex ONE = new Complex(1, 0);
-    public static final Complex I = new Complex(0, 1);
-
-    public Complex(double re, double im) {
-        this(clampToZero(BigDecimal.valueOf(re).round(MC)), clampToZero(BigDecimal.valueOf(im).round(MC)));
-    }
+    public static final Complex ZERO = new Complex(0., 0.);
+    public static final Complex ONE = new Complex(1., 0.);
+    public static final Complex I = new Complex(0., 1.);
 
     public Complex(double re) {
-        this(clampToZero(BigDecimal.valueOf(re).round(MC)), BigDecimal.ZERO);
+        this(re, 0.);
     }
 
-    public Complex(BigDecimal re, BigDecimal im) {
-        this.re = clampToZero(re.round(MC));
-        this.im = clampToZero(im.round(MC));
-    }
-
-    public Complex(BigDecimal re) {
-        this(clampToZero(re), BigDecimal.ZERO);
-    }
-
-    public Complex(Complex complex) {
-        this(complex.re, complex.im);
+    public Complex(Complex other) {
+        this(other.re, other.im);
     }
 
     public Complex add(Complex other) {
         return new Complex(
-                this.re.add(other.re, MC).stripTrailingZeros(),
-                this.im.add(other.im, MC).stripTrailingZeros()
+                this.re + other.re,
+                this.im + other.im
         );
     }
 
     public Complex multiply(Complex other) {
         return new Complex(
-                this.re.multiply(other.re, MC).subtract(this.im.multiply(other.im, MC), MC).stripTrailingZeros(),
-                this.re.multiply(other.im, MC).add(this.im.multiply(other.re, MC), MC).stripTrailingZeros()
+                this.re * other.re - this.im * other.im,
+                this.re * other.im + this.im * other.re
         );
     }
 
     public Complex divide(Complex other) {
-        BigDecimal a = this.re;
-        BigDecimal b = this.im;
-        BigDecimal c = other.re;
-        BigDecimal d = other.im;
 
-        BigDecimal denominator = c.multiply(c, MC).add(d.multiply(d, MC), MC);
+        double denominator = other.absSquared();
 
-        if (denominator.equals(BigDecimal.ZERO)) {
-            throw new ArithmeticException("Division by zero complex number.");
+        if (denominator == 0.) {
+            throw new ArithmeticException("Complex division by zero.");
         }
 
-        BigDecimal real = a.multiply(c, MC).add(b.multiply(d, MC), MC).divide(denominator, MC);
-        BigDecimal imag = b.multiply(c, MC).subtract(a.multiply(d, MC), MC).divide(denominator, MC);
+        double real = (this.re * other.re + this.im * other.im) / denominator;
+        double imag = (this.im * other.re - this.re * other.im) / denominator;
 
-        return new Complex(
-                real.stripTrailingZeros(),
-                imag.stripTrailingZeros()
-        );
+        return new Complex(real, imag);
     }
 
     public Complex conjugate() {
-        return new Complex(re, im.negate());
+        return new Complex(re, -im);
     }
 
-    public BigDecimal abs() {
-        return BigDecimalMath.sqrt(absSquared(), MC);
+    public double abs() {
+        return Math.sqrt(absSquared());
     }
 
-    public BigDecimal absSquared() {
-        return re.multiply(re, MC).add(im.multiply(im, MC), MC);
+    public double absSquared() {
+        return re * re + im * im;
     }
 
     @Override
     public String toString() {
-        return zeroIfTiny(re.round(PRINT_MC)) + (im.doubleValue() >= 0 ? " + " : " - ") + zeroIfTiny(im.abs().round(PRINT_MC)) + "i";
+        return re + (im >= 0. ? " + " : " - ") + Math.abs(im) + "i";
     }
 
-    public static Complex cis(BigDecimal theta) {
-        return new Complex(BigDecimalMath.cos(theta, MC), BigDecimalMath.sin(theta, MC));
+    public String toString(DecimalFormat df) {
+        return df.format(re) + (im >= 0. ? " + " : " - ") + df.format(Math.abs(im)) + "i";
     }
 
-    public BigDecimal direction() {
+    public static Complex cis(double theta) {
+        return new Complex(Math.cos(theta), Math.sin(theta));
+    }
+
+    public double directionDegrees() {
+        return this.directionRadians() * 180. / Math.PI;
+    }
+
+    public double directionRadians() {
         if (this.equals(Complex.ZERO))
-            return BigDecimal.ZERO;
+            return 0.;
 
-        return this.directionRadians()
-                .multiply(BigDecimal.valueOf(180)
-                        .divide(BigDecimalMath.pi(MC), MC.getPrecision(), MC.getRoundingMode()));
-    }
-
-    public BigDecimal directionRadians() {
-        if (this.equals(Complex.ZERO))
-            return BigDecimal.ZERO;
-
-        return BigDecimalMath.atan2(im, re, MC);
+        return Math.atan2(im, re);
     }
 
     @Override
     public boolean equals(Object o) {
-        if (o instanceof Complex(BigDecimal re1, BigDecimal im1)) {
+        if (o instanceof Complex(double re1, double im1)) {
             return MathUtils.isCloseTo(re, re1) && MathUtils.isCloseTo(im, im1);
         }
         return false;

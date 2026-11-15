@@ -6,8 +6,8 @@ import lombok.ToString;
 public class OptimizerState {
 
     public int iteration;
-    public int threshold;
     public int bestCandidate;
     public int bestValue;
+    public int step;
     public int fails;
 }

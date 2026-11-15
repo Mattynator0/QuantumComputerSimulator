@@ -4,15 +4,17 @@ import lombok.Getter;
 
 import java.util.List;
 
+/// The nodes a rule wants to rewrite.
 @Getter
 class Match {
-    List<DAGNode> nodes;
+
+    private final List<DAGNode> nodes;
 
     Match(DAGNode... nodes) {
-        this.nodes = List.of(nodes);
+        this(List.of(nodes));
     }
 
     Match(List<DAGNode> nodes) {
-        this.nodes = nodes;
+        this.nodes = List.copyOf(nodes);
     }
 }

@@ -17,13 +17,8 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.34</version>
+            <version>1.18.46</version>
             <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>ch.obermuhlner</groupId>
-            <artifactId>big-math</artifactId>
-            <version>2.3.0</version>
         </dependency>
         <dependency>
             <groupId>org.knowm.xchart</groupId>
@@ -44,5 +39,20 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.1</version>
+                <configuration>
+                    <!-- From JDK 23 on, javac only runs annotation processors when asked, which
+                         would otherwise silently drop every Lombok-generated accessor. -->
+                    <proc>full</proc>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>

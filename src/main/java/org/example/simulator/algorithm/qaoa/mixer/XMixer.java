@@ -7,8 +7,10 @@ public class XMixer implements Mixer {
     @Override
     public void applyMixer(QuantumCircuit qc, double beta) {
 
-        for(int i = 0; i < qc.getQubitCount(); i++) {
-            qc.rx(2.0 * beta, i);
-        }
+//        QuantumRegister reg = qc.getQubits();
+//        for(int i = 0; i < qc.getQubitCount(); i++) {
+//            qc.rx(2.0 * beta, reg.get(i));
+//        }
+        qc.rx(2 * beta, qc.getQubits());
     }
 }

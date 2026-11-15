@@ -1,9 +1,16 @@
 package org.example.simulator.optimizer;
 
 import org.example.simulator.GateType;
+import org.example.simulator.Qubit;
 
-import java.util.*;
+import java.util.Objects;
+import java.util.Set;
 
+/// The predicates a rule uses to recognize the part of the circuit it rewrites.
+///
+/// They only look at the nodes themselves, not at their position in the DAG: whether a node can be
+/// moved towards another one is `MoveRight`'s business, and what the corresponding gates do
+/// algebraically is `GateAlgebra`'s.
 class DAGPattern {
 
     static boolean isGate(DAGNode n, GateType g) {
@@ -24,25 +31,35 @@ class DAGPattern {
     }
 
     static boolean isSameControls(DAGNode... nodes) {
-        Set<Integer> controls = nodes[0].tr.getQuantumControls();
+        Set<Qubit> controls = nodes[0].tr.getControls();
 
         for (DAGNode n : nodes) {
-            if (!controls.equals(n.tr.getQuantumControls())) return false;
+            if (!controls.equals(n.tr.getControls())) return false;
         }
-
         return true;
     }
 
     static boolean isSameTarget(DAGNode... nodes) {
-        int target = nodes[0].tr.getTarget();
+        Qubit target = nodes[0].tr.getTarget();
 
         for (DAGNode n : nodes) {
-            if (target != n.tr.getTarget()) return false;
+            if (!Objects.equals(target, n.tr.getTarget())) return false;
         }
-
         return true;
     }
 
+    static boolean isSameQubitSet(DAGNode... nodes) {
+
+        Set<Qubit> q = nodes[0].getQubits();
+
+        for (DAGNode n : nodes) {
+            if (!q.equals(n.getQubits())) return false;
+        }
+        return true;
+    }
+
+    /// Whether the nodes act on the same qubits, so that swapping control and target does not change
+    /// the operation of a symmetric gate.
     static boolean isSameQubits(DAGNode... nodes) {
 
         boolean allSymmetric = true;
@@ -59,77 +76,12 @@ class DAGPattern {
         else return isSameControlsAndTarget(nodes);
     }
 
-    static boolean isSameQubitSet(DAGNode... nodes) {
-
-        Set<Integer> q = nodes[0].getQubits();
-
-        for (DAGNode n : nodes) {
-            if (!q.equals(n.getQubits())) return false;
-        }
-        return true;
-    }
-
+    /// Whether the nodes rotate around the same axis. `H` has no rotation axis, so it never matches.
     static boolean isSameRotationAxis(DAGNode a, DAGNode b) {
         GateType aGate = a.tr.getGate().getType();
         GateType bGate = b.tr.getGate().getType();
 
         if (aGate == GateType.H || bGate == GateType.H) return false;
         return aGate.getRotationAxis().equals(bGate.getRotationAxis());
-    }
-
-    /// if same target:
-    ///
-    /// return same rotation axis OR hadamard with hadamard.
-    ///
-    /// else:
-    ///
-    /// if A controls contain B target,
-    /// B = {Z, RZ, PHASE},
-    /// otherwise
-    /// B = anything
-    ///
-    /// if B controls contain A target,
-    /// A = {Z, RZ, PHASE},
-    /// otherwise
-    /// A = anything
-    ///
-    static boolean commutes(DAGNode a, DAGNode b) {
-
-        if (Collections.disjoint(a.getQubits(), b.getQubits())) return true;
-
-        if (a.tr.getTarget() == b.tr.getTarget()) {
-            if (isSameRotationAxis(a, b)) return true;
-            return isGate(a, GateType.H) && isGate(b, GateType.H);
-        }
-
-        boolean bMustBeDiagonal = a.tr.getQuantumControls().contains(b.tr.getTarget());
-        boolean aMustBeDiagonal = b.tr.getQuantumControls().contains(a.tr.getTarget());
-
-        boolean aIsDiagonal = isDiagonal(a);
-        boolean bIsDiagonal = isDiagonal(b);
-
-        return (aIsDiagonal && bIsDiagonal)
-                || (!aMustBeDiagonal && !bMustBeDiagonal)
-                || (!aMustBeDiagonal && bIsDiagonal)
-                || (!bMustBeDiagonal && aIsDiagonal);
-    }
-
-    /// Checks if all paths leading from `a` to `b` commute with `a`.
-    static boolean canMoveRight(DAGNode a, DAGNode b) {
-        Queue<DAGNode> queue = new LinkedList<>(a.successors);
-        Set<DAGNode> visited = new HashSet<>(Set.of(b));
-
-        while (!queue.isEmpty()) {
-            DAGNode n = queue.poll();
-
-            if (visited.contains(n)) continue;
-
-            if (!commutes(a, n)) return false;
-
-            queue.addAll(n.successors);
-            visited.add(n);
-        }
-
-        return true;
     }
 }

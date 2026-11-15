@@ -1,57 +1,33 @@
 package org.example.simulator.algorithm;
 
 import org.example.simulator.QuantumCircuit;
+import org.example.simulator.Qubit;
 import org.example.simulator.register.QuantumRegister;
-
-import static org.example.math.MathUtils.isBitSet;
 
 public class Oracles {
 
-    public static QuantumCircuit phaseOracle(QuantumRegister reg, int[] values) {
+    public static QuantumCircuit phaseOracle(QuantumRegister reg, int[] statesToMark) {
 
-        QuantumCircuit qc = new QuantumCircuit(reg.getQubitCount());
+        QuantumCircuit qc = new QuantumCircuit(reg);
 
-        for (int value : values) {
-            for (int i = 0; i < qc.getQubitCount(); i++) {
-                if (!isBitSet(value, i)) {
-                    qc.x(reg.get(i));
-                }
-            }
-
-            qc.mcp(Math.PI, reg.allButLast(), reg.last());
-
-            for (int i = 0; i < qc.getQubitCount(); i++) {
-                if (!isBitSet(value, i)) {
-                    qc.x(reg.get(i));
-                }
-            }
+        for (int state : statesToMark) {
+            qc.x(reg, ~state);
+            qc.mcp(Math.PI, reg);
+            qc.x(reg, ~state);
         }
-
         return qc;
     }
 
-    public static QuantumCircuit bitOracle(int qubitCount, int[] values) {
+    public static QuantumCircuit bitOracle(Qubit markBit, QuantumRegister reg, int[] statesToMark) {
 
-        QuantumRegister reg = new QuantumRegister(qubitCount - 1);
-        QuantumRegister bitReg = new QuantumRegister(1);
-        QuantumCircuit qc = new QuantumCircuit(reg, bitReg);
+        QuantumRegister oracleReg = reg.append(markBit);
+        QuantumCircuit qc = new QuantumCircuit(oracleReg);
 
-        for (int value : values) {
-            for (int i : reg.all()) {
-                if (!isBitSet(value, i)) {
-                    qc.x(i);
-                }
-            }
-
-            qc.mcx(reg.all(), bitReg.first());
-
-            for (int i : reg.all()) {
-                if (!isBitSet(value, i)) {
-                    qc.x(i);
-                }
-            }
+        for (int state : statesToMark) {
+            qc.x(reg, ~state);
+            qc.mcx(reg.getQubits(), markBit);
+            qc.x(reg, ~state);
         }
-
         return qc;
     }
 }

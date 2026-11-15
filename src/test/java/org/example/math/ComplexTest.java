@@ -2,8 +2,9 @@ package org.example.math;
 
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
+import java.text.DecimalFormat;
 
+import static org.example.TestUtils.assertCloseTo;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class ComplexTest {
@@ -14,8 +15,8 @@ public class ComplexTest {
         double imag = 2.2;
         Complex c = new Complex(real, imag);
 
-        assertEquals(real, c.re().doubleValue());
-        assertEquals(imag, c.im().doubleValue());
+        assertEquals(real, c.re());
+        assertEquals(imag, c.im());
     }
 
     @Test
@@ -23,59 +24,30 @@ public class ComplexTest {
         double real = 1.1;
         Complex c = new Complex(real);
 
-        assertEquals(real, c.re().doubleValue());
-        assertEquals(0, c.im().doubleValue());
-    }
-
-    @Test
-    public void constructor_BigDecimal_BigDecimal() {
-        BigDecimal real = BigDecimal.valueOf(1.1);
-        BigDecimal imag = BigDecimal.valueOf(2.2);
-        Complex c = new Complex(real, imag);
-
         assertEquals(real, c.re());
-        assertEquals(imag, c.im());
+        assertEquals(0., c.im());
     }
 
     @Test
-    public void constructor_BigDecimal() {
-        BigDecimal real = BigDecimal.valueOf(1.1);
-        Complex c = new Complex(real);
+    public void constructor_complex() {
+        double real = 1.1;
+        double imag = 2.2;
+        Complex original = new Complex(real, imag);
+        Complex copy = new Complex(original);
 
-        assertEquals(real, c.re());
-        assertEquals(BigDecimal.ZERO, c.im());
-    }
-
-    @Test
-    public void constructor_clampSmallValues() {
-        double real = 1e-14; // chosen arbitrarily, not related to the math context
-        double imag = 1e-14;
-
-        Complex c = new Complex(real);
-        assertEquals(0, c.re().doubleValue());
-
-        c = new Complex(real, imag);
-        assertEquals(0, c.re().doubleValue());
-        assertEquals(0, c.im().doubleValue());
-
-        c = new Complex(BigDecimal.valueOf(real));
-        assertEquals(BigDecimal.ZERO, c.re());
-
-        c = new Complex(BigDecimal.valueOf(real), BigDecimal.valueOf(imag));
-        assertEquals(BigDecimal.ZERO, c.re());
-        assertEquals(BigDecimal.ZERO, c.im());
+        assertEquals(original, copy);
+        assertNotSame(original, copy);
     }
 
     @Test
     public void add() {
-        Complex c = new Complex(1.1, 2.2);
-        Complex z = new Complex(3.3, 4.4);
+        Complex a = new Complex(1.1, 2.2);
+        Complex b = new Complex(3.3, 4.4);
 
-        z = z.add(c);
+        a = a.add(b);
 
         Complex expected = new Complex(4.4, 6.6);
-        assertEquals(0, expected.re().compareTo(z.re()));
-        assertEquals(0, expected.im().compareTo(z.im()));
+        assertEquals(expected, a);
     }
 
     @Test
@@ -86,8 +58,7 @@ public class ComplexTest {
         a = a.multiply(b);
 
         Complex expected = new Complex(-6.05, 12.1);
-        assertEquals(0, expected.re().compareTo(a.re()));
-        assertEquals(0, expected.im().compareTo(a.im()));
+        assertEquals(expected, a);
     }
 
     @Test
@@ -98,8 +69,7 @@ public class ComplexTest {
         a = a.divide(b);
 
         Complex expected = new Complex(0.44, 0.08);
-        assertEquals(0, expected.re().compareTo(a.re()));
-        assertEquals(0, expected.im().compareTo(a.im()));
+        assertEquals(expected, a);
     }
 
     @Test
@@ -117,28 +87,27 @@ public class ComplexTest {
         a = a.conjugate();
 
         Complex expected = new Complex(1.1, -2.2);
-        assertEquals(0, expected.re().compareTo(a.re()));
-        assertEquals(0, expected.im().compareTo(a.im()));
+        assertEquals(expected, a);
     }
 
     @Test
     public void abs() {
         Complex a = new Complex(1.1, 2.2);
 
-        BigDecimal result = a.abs();
+        double result = a.abs();
 
-        BigDecimal expected = BigDecimal.valueOf(2.4597);
-        assertEquals(expected.doubleValue(), result.doubleValue(), 0.0001);
+        double expected = 2.4597;
+        assertEquals(expected, result, 0.0001);
     }
 
     @Test
     public void absSquared() {
         Complex a = new Complex(1.1, 2.2);
 
-        BigDecimal result = a.absSquared();
+        double result = a.absSquared();
 
-        BigDecimal expected = BigDecimal.valueOf(6.05);
-        assertEquals(expected.doubleValue(), result.doubleValue());
+        double expected = 6.05;
+        assertCloseTo(expected, result);
     }
 
     @Test
@@ -151,23 +120,31 @@ public class ComplexTest {
     }
 
     @Test
-    public void cis() {
-        double theta = Math.PI / 6;
+    public void toStringTest_decimalFormat() {
+        Complex a = new Complex(1.1, 2.2);
+        Complex b = new Complex(3.3, -4.4);
+        DecimalFormat df = new DecimalFormat("0.000");
 
-        Complex result = Complex.cis(BigDecimal.valueOf(theta));
-
-        Complex expected = new Complex(0.86602, 0.5);
-        assertEquals(expected.re().doubleValue(), result.re().doubleValue(), 0.0001);
-        assertEquals(expected.im().doubleValue(), result.im().doubleValue(), 0.0001);
+        assertEquals("1.100 + 2.200i", a.toString(df));
+        assertEquals("3.300 - 4.400i", b.toString(df));
     }
 
     @Test
-    public void direction() {
+    public void cis() {
+        double theta = Math.PI / 6;
+        Complex result = Complex.cis(theta);
+
+        assertCloseTo(0.866, result.re());
+        assertCloseTo(0.5, result.im());
+    }
+
+    @Test
+    public void directionDegrees() {
         Complex a = new Complex(1.1, 2.2);
         Complex b = new Complex(0, 0);
 
-        assertEquals(63.435, a.direction().doubleValue(), 0.0001);
-        assertEquals(BigDecimal.ZERO, b.direction());
+        assertCloseTo(63.435, a.directionDegrees());
+        assertCloseTo(0., b.directionDegrees());
     }
 
     @Test
@@ -175,14 +152,21 @@ public class ComplexTest {
         Complex a = new Complex(1.1, 2.2);
         Complex b = new Complex(0, 0);
 
-        assertEquals(1.10715, a.directionRadians().doubleValue(), 0.0001);
-        assertEquals(BigDecimal.ZERO, b.directionRadians());
+        assertCloseTo(1.107, a.directionRadians());
+        assertCloseTo(0., b.directionRadians());
     }
 
     @Test
-    public void equalsTest() {
-        Complex a = new Complex(1.1, 2.2);
+    public void equalsTest_closeEnough() {
+        Complex a = new Complex(1.10000000001, 2.2);
 
         assertEquals(new Complex(1.1, 2.2), a);
+    }
+
+    @Test
+    public void equalsTest_notCloseEnough() {
+        Complex a = new Complex(1.11, 2.2);
+
+        assertNotEquals(new Complex(1.1, 2.2), a);
     }
 }

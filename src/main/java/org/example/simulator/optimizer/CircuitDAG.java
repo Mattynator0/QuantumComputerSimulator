@@ -2,24 +2,30 @@ package org.example.simulator.optimizer;
 
 import lombok.val;
 import org.example.simulator.QuantumTransformation;
+import org.example.simulator.Qubit;
 
 import java.util.*;
 
+/// The transformations of a circuit as a directed acyclic graph.
+///
+/// `nodes` keeps the order of the circuit, which is a topological order of the graph: every edge
+/// points from a node to a later one. [#removeNode(DAGNode)] only removes nodes and reconnects
+/// their neighbours, so the order stays topological and a node keeps its [DAGNode#index].
 public class CircuitDAG {
 
     List<DAGNode> nodes = new ArrayList<>();
-    double globalPhase = 0;
 
-    public static CircuitDAG fromTransformations(List<QuantumTransformation> tfs) {
+    public static CircuitDAG fromList(List<QuantumTransformation> tfs) {
         CircuitDAG dag = new CircuitDAG();
 
-        Map<Integer, DAGNode> lastOnQubit = new HashMap<>();
+        Map<Qubit, DAGNode> lastOnQubit = new HashMap<>();
 
         for (val tf : tfs) {
             DAGNode node = new DAGNode(tf);
+            node.index = dag.nodes.size();
             dag.nodes.add(node);
 
-            for (int q : node.getQubits()) {
+            for (Qubit q : node.getQubits()) {
                 if (lastOnQubit.containsKey(q)) {
                     DAGNode prev = lastOnQubit.get(q);
                     prev.successors.add(node);

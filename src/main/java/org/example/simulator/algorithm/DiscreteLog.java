@@ -1,20 +1,20 @@
 package org.example.simulator.algorithm;
 
 import org.example.math.MathUtils;
-import org.example.simulator.QuantumArithmetic;
 import org.example.simulator.QuantumCircuit;
+import org.example.simulator.Qubit;
 import org.example.simulator.register.ClassicalRegister;
 import org.example.simulator.register.QuantumRegister;
 
 public class DiscreteLog {
 
-    /// Build circuit to find the order of A in Z_N, using 4n+2 qubits, with n = ceil(log2(N)).
+    /// Build circuit to find the order of A in Z_N, using 4n+2 qubits, where n = ceil(log2(N)).
     ///
     /// @param A         int.
     /// @param N         int.
-    /// @param precision Number of qubits to use for phase estimation. If null, use default second: 2n.
+    /// @param precision Number of qubits to use for phase estimation. If null, use default: 2n.
     /// @return Order finding circuit.
-    private static QuantumCircuit orderFindingCircuit(int A, int N, Integer precision) {
+    private static int orderFindingCircuit(int A, int N, Integer precision) {
 
         if (MathUtils.gcd(A, N) > 1)
             throw new IllegalArgumentException("A and N must be coprime.");
@@ -27,19 +27,24 @@ public class DiscreteLog {
         QuantumRegister controlReg = new QuantumRegister(m);
         QuantumRegister targetReg = new QuantumRegister(n);
         QuantumRegister ancillaReg = new QuantumRegister(n + 2);
-        QuantumCircuit qc = new QuantumCircuit(controlReg, targetReg, ancillaReg);
+
+        ClassicalRegister classicalReg = new ClassicalRegister(targetReg.size());
+
+        QuantumCircuit qc = new QuantumCircuit(ancillaReg, targetReg, controlReg);
+        qc.appendClassicalRegisters(classicalReg);
         QuantumArithmetic qa = new QuantumArithmetic(qc);
 
         // prepare control register in "all quantum integers" state
         qc.h(controlReg);
 
         // prepare target register in |1> state
-        qc.x(targetReg.get(1));
+        qc.x(targetReg.get(0));
 
-        qa.exponentiateModulo(controlReg.all(), targetReg.all(), A, N, ancillaReg.all());
+        qa.exponentiateModulo(controlReg, targetReg, A, N, ancillaReg);
+        qc.iqft(controlReg, false, true);
 
-        qc.iqft(false, true);
-        return qc;
+        qc.run();
+        return qc.measureOnce(controlReg);
     }
 
     /// Build circuit to find the order of A in Z_N, using modular multiplication with a single control qubit
@@ -47,9 +52,9 @@ public class DiscreteLog {
     ///
     /// @param A         int.
     /// @param N         int.
-    /// @param precision int. Number of qubits to use for phase estimation. If null, use default second: 2n.
+    /// @param precision int. Number of qubits to use for phase estimation. If null, use default: 2n.
     /// @return Order finding circuit.
-    private static QuantumCircuit orderFindingCircuitOneControl(int A, int N, Integer precision) {
+    private static int orderFindingCircuitOneControl(int A, int N, Integer precision) {
 
         if (MathUtils.gcd(A, N) > 1)
             throw new IllegalArgumentException("A and N must be coprime.");
@@ -72,18 +77,18 @@ public class DiscreteLog {
         qc.x(targetReg.get(0));
 
         // sequential measurements
-        int cBit = controlReg.first();
+        Qubit cBit = controlReg.getFirst();
         for (int i = 0; i < m; i++) {
             qc.h(cBit);
 
             int B = MathUtils.modPow(A, 1 << (m - i - 1), N);
             qa.cMultiplyModulo(cBit,
-                    targetReg.all(),
-                    ancillaReg.range(0, n),
+                    targetReg,
+                    ancillaReg.subRegister(0, n),
                     B,
                     N,
-                    ancillaReg.get(n),
-                    ancillaReg.get(n + 1),
+                    ancillaReg.subRegister(n, n+1),
+                    ancillaReg.subRegister(n+1, n+2),
                     true,
                     true);
 
@@ -93,14 +98,13 @@ public class DiscreteLog {
 
             qc.h(cBit);
 
-            // measurement
-            qc.measureTransformation(i, cBit);
-
-            // reset
+            // Measure into the i-th classical bit, then reset the control qubit if the result was 1.
+            qc.measureTransformation(cBit, outputReg, i);
             qc.ccx(outputReg.get(i), cBit);
         }
 
-        return qc;
+//        qc.run();
+        return qc.getClassicalRegisterValue();
     }
 
     /// Carry out search algorithm for finding the order of the integer A in Z_N, i.e. the
@@ -109,19 +113,12 @@ public class DiscreteLog {
     ///
     /// @param A                 int.
     /// @param N                 int.
-    /// @param precision         Number of qubits to use for phase estimation. If null, use default second: 2*ceil(log2(N)).
+    /// @param precision         Number of qubits to use for phase estimation. If null, use default: 2*ceil(log2(N)).
     /// @param oneControlCircuit Use order finding circuit with a single control qubit.
-    /// @return The first element is the order (if found) or zero (if not).
-    ///
-    /// @apiNote Currently, the one control circuit is not implemented as it would require an overhaul
-    /// of the circuit measurement system. Therefore, please do not use `oneControlCircuit = true`
+    /// @return `result = j * 2^precision / r`, where `r` is the order and `j = 0, 1, ..., r-1`.
     public static int findOrder(int A, int N, Integer precision, boolean oneControlCircuit) {
-
-        QuantumCircuit qc = oneControlCircuit
+        return oneControlCircuit
                 ? orderFindingCircuitOneControl(A, N, precision)
                 : orderFindingCircuit(A, N, precision);
-
-        qc.run();
-        return qc.measureOnce();
     }
 }

@@ -8,7 +8,7 @@ import org.example.simulator.register.QuantumRegister;
 import java.util.Arrays;
 import java.util.stream.IntStream;
 
-import static org.example.math.MathUtils.normalizeState;
+import static org.example.math.MathUtils.normalizeVector;
 
 public class MottonenStateInitialization {
 
@@ -17,14 +17,18 @@ public class MottonenStateInitialization {
     // which itself is based on:
     // Möttönen et al. (2004) <https://arxiv.org/abs/quant-ph/0407010>
 
-    public static void perform(QuantumCircuit qc, QuantumRegister reg, Complex[] state) {
-        int n = MathUtils.ceilLog2(state.length);
-        assert reg.getQubitCount() == n;
+    /// Performs Möttönen's state initialization
+    public static void perform(QuantumCircuit qc, QuantumRegister reg, Complex[] inputState) {
+        int n = MathUtils.ceilLog2(inputState.length);
 
-        normalizeState(state);
+        if (reg.size() != n)
+            throw new IllegalArgumentException("Register size doesn't match input state size.");
 
-        double[] magnitudes = new double[state.length];
-        for (int i = 0; i < state.length; i++) magnitudes[i] = state[i].absSquared().doubleValue();
+        Complex[] normalizedState = Arrays.stream(inputState).map(Complex::new).toArray(Complex[]::new);
+        normalizeVector(normalizedState);
+
+        double[] magnitudes = new double[normalizedState.length];
+        for (int i = 0; i < normalizedState.length; i++) magnitudes[i] = normalizedState[i].absSquared();
 
         // RY rotations and CNOTs to rotate into correct amplitudes
         for (int k = n; k > 0; k--) {
@@ -34,8 +38,8 @@ public class MottonenStateInitialization {
             mottonenApplyUniformRotation(qc, reg, 'y', alphaYK, controls, target);
         }
 
-        double[] omegas = new double[state.length];
-        for (int i = 0; i < state.length; i++) omegas[i] = state[i].directionRadians().doubleValue();
+        double[] omegas = new double[normalizedState.length];
+        for (int i = 0; i < normalizedState.length; i++) omegas[i] = normalizedState[i].directionRadians();
 
         // RZ rotations and CNOTs to rotate into correct relative phases
         for (int k = n; k > 0; k--) {
@@ -45,13 +49,8 @@ public class MottonenStateInitialization {
             mottonenApplyUniformRotation(qc, reg, 'z', alphaZK, controls, target);
         }
 
-        // keep track of the global phase so the result of running the circuit matches the input state
-        double globalPhase = 0.0;
-        for (double w : omegas) {
-            globalPhase -= w;
-        }
-        globalPhase /= omegas.length;
-        qc.setGlobalPhase(qc.getGlobalPhase() + globalPhase);
+        double meanOmega = Arrays.stream(omegas).sum() / omegas.length;
+        qc.applyGlobalPhase(meanOmega);
     }
 
     private static double[] alphaZ(double[] omegas, int n, int k) {

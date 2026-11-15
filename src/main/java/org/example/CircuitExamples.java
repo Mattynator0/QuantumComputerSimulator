@@ -1,75 +1,125 @@
 package org.example;
 
-import org.example.math.Complex;
 import org.example.math.MathUtils;
-import org.example.simulator.dto.OptimizerState;
 import org.example.simulator.QuantumAlgorithms;
 import org.example.simulator.QuantumCircuit;
+import org.example.simulator.Qubit;
+import org.example.simulator.dto.OptimizerState;
 import org.example.simulator.register.QuantumRegister;
-import org.example.utils.BinaryPolynomial;
+import org.example.math.BinaryPolynomial;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
-import java.util.stream.IntStream;
 
 import static org.example.math.MathUtils.getOptimalGroverIterations;
 
 public class CircuitExamples {
 
-    public static QuantumCircuit grover(int qubitCount, int[] goodResults) {
+    /// Constructs a Grover search circuit that amplifies the amplitudes of the specified basis states.
+    ///
+    /// Grover's algorithm searches an unstructured space by repeatedly applying the
+    /// Grover operator, which consists of a phase oracle followed by a diffusion
+    /// operation. The oracle marks the desired basis states by flipping their phase,
+    /// while the diffusion step amplifies their amplitudes, increasing the probability
+    /// of measuring them.
+    ///
+    /// The amplification is periodic, so applying the Grover operator too many
+    /// times causes the probability of the desired states to decrease again. This
+    /// method automatically uses the optimal number of iterations for the given number
+    /// of qubits and marked states.
+    ///
+    /// Although the marked states are explicitly provided in this example, Grover's
+    /// algorithm is most useful when they are not known in advance and are identified
+    /// by evaluating an oracle. See
+    /// {@link CircuitExamples#findMaxOfPolynomial(int, int, double[])} 
+    /// for a more realistic application.
+    ///
+    /// @param qubitCount the number of qubits in the search register
+    /// @param markedStates the computational basis states to mark and amplify; must be in range `(0, 2^qubitCount)`
+    /// @return a quantum circuit initialized in a uniform superposition and configured
+    ///         to amplify the specified states using Grover's algorithm.
+    public static QuantumCircuit grover(int qubitCount, int[] markedStates) {
 
-        // prepare a uniform state (although this implementation also works with other starting states)
+        // prepare the initial state (e.g. the uniform state)
         QuantumRegister reg = new QuantumRegister(qubitCount);
         QuantumCircuit initialState = new QuantumCircuit(reg);
         initialState.uniform();
 
         // prepare a phase oracle (flip phase of good outcomes)
-        QuantumCircuit oracle = QuantumAlgorithms.phaseOracle(reg, goodResults);
+        QuantumCircuit oracle = QuantumAlgorithms.phaseOracle(reg, markedStates);
 
-        // apply the grover operator iteratively until the amplitudes of good outcomes are maximized
-        int iterations = getOptimalGroverIterations(qubitCount, goodResults.length);
+        // get the Grover operator with the optimal number of layers (such that the amplitudes of good outcomes are maximized)
+        int iterations = getOptimalGroverIterations(qubitCount, markedStates.length);
+        QuantumCircuit groverOperator = QuantumAlgorithms.grover(initialState, oracle, iterations);
 
-        return QuantumAlgorithms.grover(initialState, oracle, iterations);
+        // apply the operator
+        initialState.append(groverOperator, reg);
+        return initialState;
     }
 
+    /// Performs a change of basis to the Fourier basis.
+    ///
+    /// The transformation into Fourier basis can be represented as `|x> -> [ω^0x, ω^1x, ..., ω^(N-1)x]`,
+    /// where `ω = e^{-i 2π / N}`, or the Nth root of unity.
     public static QuantumCircuit quantumFourierTransform(int qubitCount, int fourierBasis) {
 
         // create a fourier basis state (phase angles increasing by a constant amount)
         QuantumCircuit qc = new QuantumCircuit(qubitCount);
         qc.uniform();
-        qc.geometric(fourierBasis * Math.TAU / (1 << qubitCount));
+        qc.geometric(fourierBasis * Math.TAU / (1 << qubitCount), qc.getQubits(), true);
 
         // apply inverse quantum fourier transform
-        qc.iqft(false, true);
+        qc.iqft(qc.getQubits(), false, false);
 
         return qc;
     }
 
-    public static QuantumCircuit quantumPhaseEstimation(int estimationQubitCount) {
+    /// Constructs a Quantum Phase Estimation circuit which estimates the phase applied by a unitary operation to the whole statevector.
+    ///
+    /// Given a unitary `U` and its eigenstate prepared by `statePrep`
+    /// (i.e. applying `U` to the state created by `statePrep` only applies a global phase shift),
+    /// the algorithm estimates the phase `phi` in `U|psi> = e^(2*phi*pi*i)|psi>`:
+    ///
+    /// 1. prepares the target register in the eigenstate using `statePrep`,
+    /// 2. puts the estimation register into a uniform superposition,
+    /// 3. applies controlled powers of the unitary circuit (U^(2^i) controlled on estimation qubit i),
+    /// 4. applies the inverse QFT on the estimation register.
+    ///
+    /// If the estimated value is not a whole number in the register, the true value can be estimated using a formula:
+    ///
+    /// `x = b + sqrt(p_a) / sqrt(p_a) + sqrt(p_b)`, where
+    ///
+    /// `a` and `b` denote the outcomes that fall above and below the true value `x`,
+    ///
+    /// `p_a` and `p_b` denote the probabilities of `a` and`b`.
+    public static QuantumCircuit quantumPhaseEstimation(int estimationQubitCount, double value) {
 
         // create a circuit which prepares an eigenstate
-        QuantumCircuit statePrep = new QuantumCircuit(1);
-        statePrep.x(0);
-        statePrep.rx(-Math.PI / 2, 0);
+        QuantumRegister statePrepReg = new QuantumRegister(1);
+        QuantumCircuit statePrep = new QuantumCircuit(statePrepReg);
+        statePrep.x(statePrepReg.getFirst());
+        statePrep.rx(-Math.PI / 2, statePrepReg.getFirst());
 
         // create the circuit corresponding to the eigenstate above
-        QuantumCircuit eigenCircuit = new QuantumCircuit(1);
-        double v = 4.7;
-        eigenCircuit.ry(v * Math.TAU / 4, 0);
+        QuantumRegister unitaryReg = new QuantumRegister(1);
+        QuantumCircuit unitary = new QuantumCircuit(unitaryReg);
+        unitary.ry(value * Math.TAU / 4, unitaryReg.getFirst());
 
         QuantumRegister estimationReg = new QuantumRegister(estimationQubitCount);
         QuantumRegister targetReg = new QuantumRegister(statePrep.getQubitCount());
 
         // estimate the eigenvalue (phase by which eigenstate is rotated)
-        return QuantumAlgorithms.qpe(estimationReg, targetReg, statePrep, eigenCircuit, false);
+        return QuantumAlgorithms.quantumPhaseEstimation(estimationReg, targetReg, statePrep, unitary, false);
     }
 
+    /// Amplitude estimation gives the combined probability of measuring a good state on circuit A.
+    ///
+    /// It works by applying the Grover operator G in place of a uniform transformation in QPE.
+    /// The measured result `v` can be converted into probability using `p = 1 - sin²(π * v / N)`,
     public static QuantumCircuit amplitudeEstimation(int estimationQubitCount, int targetQubitCount, int[] goodStates) {
-
-        // Amplitude estimation gives the combined probability of measuring a good state on circuit A.
-        // It works by applying the Grover operator G in place of a uniform transformation in QPE.
-        // The measured result `v` can be converted into probability using p = 1 - sin²(PI * v / N),
 
         // initial state we want to measure
         QuantumCircuit A = new QuantumCircuit(targetQubitCount);
@@ -82,11 +132,10 @@ public class CircuitExamples {
         return QuantumAlgorithms.amplitudeEstimation(estimationReg, targetReg, A, goodStates, false);
     }
 
-    public static QuantumCircuit findZerosOfPolynomial(int keyQubitCount,
-                                                       int valueQubitCount,
-                                                       BinaryPolynomial polynomial) {
-
-        // This method encodes a polynomial as first-second pairs into the first and second registers,
+    public static List<Integer> findZerosOfPolynomial(int keyQubitCount,
+                                                      int valueQubitCount,
+                                                      BinaryPolynomial polynomial) {
+        // This method encodes a polynomial as key-value pairs into the key and value registers respectively,
         // after which it tags zeros of the polynomial and applies the Grover operator to amplify these states.
 
         QuantumRegister keyReg = new QuantumRegister(keyQubitCount);
@@ -96,52 +145,55 @@ public class CircuitExamples {
         QuantumCircuit statePrep = QuantumAlgorithms.buildPolynomialCircuit(keyReg, valueReg, polynomial);
 
         // build a phase oracle
-        QuantumCircuit oracle = new QuantumCircuit(valueQubitCount);
+        QuantumCircuit oracle = new QuantumCircuit(valueReg);
 
-        // tag states where second == 0
-        for (int i = 0; i < valueQubitCount; i++) {
-            oracle.x(i);
-        }
-        oracle.mcp(Math.PI, IntStream.range(0, valueQubitCount - 1).toArray(), valueQubitCount - 1);
-        for (int i = 0; i < valueQubitCount; i++) {
-            oracle.x(i);
-        }
+        // tag states where value == 0
+        oracle.x(valueReg);
+        oracle.mcp(Math.PI, valueReg);
+        oracle.x(valueReg);
 
-        // construct a grover operator that amplifies tagged states (second == 0)
+        // construct a Grover operator that amplifies tagged states (value == 0)
         QuantumCircuit grover = QuantumAlgorithms.grover(statePrep, oracle, 1);
+        statePrep.append(grover);
 
-        QuantumCircuit qc = new QuantumCircuit(statePrep);
-        qc.append(grover, 0);
-        return qc;
+        statePrep.run();
+        var measurements = statePrep.measure(100 * (1 << keyQubitCount), keyReg);
+        List<Integer> zeros = new ArrayList<>();
+        for (var measurement : measurements) {
+            if (measurement.second() >= 100)
+                zeros.add(Integer.parseInt(measurement.first(), 2));
+        }
+
+        return zeros;
     }
 
     public static OptimizerState findMaxOfPolynomial(int keyQubitCount,
                                                      int valueQubitCount,
                                                      double[] polynomialTerms) {
 
-        // build a phase oracle
-        QuantumRegister oracleReg = new QuantumRegister(valueQubitCount);
-        QuantumCircuit oracle = new QuantumCircuit(oracleReg);
-
-        // tag states where second >= 0
-        int last = oracleReg.last();
-        oracle.x(last);
-        oracle.mcp(Math.PI, oracleReg.range(0, last), last);
-        oracle.x(last);
-
-        // create the stop condition for grover searching
-        Function<OptimizerState, Boolean> stopCondition = (o -> o.fails < 10);
-
-        // Grover optimizer searches iteratively for larger values of the polynomial
-        // in each iteration it applies the Grover operator n times, where n is chosen according to the provided schedule (here [0, 1])
-        int[] schedule = new int[]{0, 1};
-
         QuantumRegister keyReg = new QuantumRegister(keyQubitCount);
         QuantumRegister valueReg = new QuantumRegister(valueQubitCount);
 
-        return QuantumAlgorithms.groverOptimizer(keyReg, valueReg, polynomialTerms, oracle, schedule, stopCondition);
+        // build a phase oracle
+        QuantumCircuit oracle = new QuantumCircuit(valueReg);
+
+        // tag states where value >= 0
+        Qubit last = valueReg.getLast();
+        oracle.x(last);
+        oracle.z(last);
+        oracle.x(last);
+
+        // create the stop condition for grover searching
+        Function<OptimizerState, Boolean> stopCondition = (o -> o.fails == 10);
+
+        // Grover optimizer searches iteratively for larger values of the polynomial
+        // in each iteration it applies the Grover operator n times, where n is chosen according to the provided schedule (here [0, 1])
+        int[] schedule = new int[]{1, 2};
+
+        return QuantumAlgorithms.groverPolynomialOptimizer(keyReg, valueReg, polynomialTerms, oracle, schedule, stopCondition);
     }
 
+    /// Determines whether a boolean predicate is constant or balanced.
     public static String deutschJozsaAlgorithm(IntPredicate f, int qubitCount) {
 
         // build the Deutsch-Jozsa circuit
@@ -210,30 +262,6 @@ public class CircuitExamples {
         }
 
         System.out.println("Factor not found.");
-        return 1; // no factor found
-    }
-
-    public static void mottonenStateInitialization() {
-
-        // adapted code from PennyLane's implementation:
-        // https://docs.pennylane.ai/en/stable/_modules/pennylane/templates/state_preparations/mottonen.html#MottonenStatePreparation
-        // which itself is based on:
-        // Möttönen et al. (2004) <https://arxiv.org/abs/quant-ph/0407010>
-
-        int qubitCount = 3;
-        QuantumRegister reg = new QuantumRegister(qubitCount);
-        QuantumCircuit qc = new QuantumCircuit(reg);
-
-        // our desired state is an array of (2 ^ qubitCount) complex numbers
-        Complex[] state = new Complex[]{
-                new Complex(1, 0), new Complex(0, 2),
-                new Complex(3, 0), new Complex(0, 4),
-                new Complex(5, 0), new Complex(0, 6),
-                new Complex(7, 0), new Complex(0, 8),
-        };
-
-        QuantumAlgorithms.mottonenStateInitialization(qc, reg, state);
-        qc.run();
-        qc.printStateDetailed(); // normalized state above
+        return 1;
     }
 }

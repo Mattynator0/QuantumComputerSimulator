@@ -2,7 +2,8 @@ package org.example.simulator.algorithm.qaoa.mixer;
 
 import lombok.AllArgsConstructor;
 import org.example.simulator.QuantumCircuit;
-import org.example.utils.Pair;
+import org.example.simulator.Qubit;
+import org.example.math.Pair;
 
 import java.util.List;
 
@@ -13,14 +14,14 @@ import java.util.List;
 @AllArgsConstructor
 public class SwapMixer implements Mixer {
 
-    List<Pair<Integer, Integer>> swapPairs;
+    List<Pair<Qubit, Qubit>> swapPairs;
 
     @Override
     public void applyMixer(QuantumCircuit qc, double beta) {
         // TODO look for a more optimal implementation (right now 14 gates per pair is required)
-        for (Pair<Integer, Integer> pair : swapPairs) {
-            int a = pair.first();
-            int b = pair.second();
+        for (var pair : swapPairs) {
+            Qubit a = pair.first();
+            Qubit b = pair.second();
 
             qc.h(a);
             qc.h(b);

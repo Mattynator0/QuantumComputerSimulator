@@ -29,7 +29,7 @@ public class GradientDescentOptimizer implements ParameterOptimizer {
             double[] gradient = estimateGradient(objective, x);
 
             for (int i = 0; i < gradient.length; i++)
-                x[i] -= learningRate * gradient[i];
+                x[i] += learningRate * gradient[i];
 
             OptimizationResult result = objective.evaluate(x);
 
