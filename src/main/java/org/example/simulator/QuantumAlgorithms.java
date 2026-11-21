@@ -1,13 +1,11 @@
 package org.example.simulator;
 
-import org.example.math.Complex;
-import org.example.math.Edge;
+import org.example.math.*;
 import org.example.simulator.algorithm.*;
 import org.example.simulator.algorithm.qaoa.OptimizationResult;
 import org.example.simulator.algorithm.qaoa.optimizer.ParameterOptimizer;
 import org.example.simulator.dto.OptimizerState;
 import org.example.simulator.register.QuantumRegister;
-import org.example.math.BinaryPolynomial;
 
 import java.util.List;
 import java.util.function.Function;
@@ -111,33 +109,32 @@ public final class QuantumAlgorithms {
         qc.x(reg);
     }
 
-    /// Performs Quantum Phase Estimation.
+    /// Builds the Quantum Phase Estimation component.
     ///
-    /// Given a unitary `U` and its eigenstate prepared by `statePrep`, the algorithm estimates
-    /// the phase `phi` in `U|psi> = e^(2*phi*pi*i)|psi>`:
+    /// The returned circuit acts on the qubits of `estimationReg` and `targetReg` and estimates the
+    /// phase `phi` in `U|psi> = e^(2*phi*pi*i)|psi>`:
     ///
-    /// 1. prepares the target register in the eigenstate using `statePrep`,
-    /// 2. puts the estimation register into a uniform superposition,
-    /// 3. applies controlled powers of the unitary circuit (U^(2^i) controlled on estimation qubit i),
-    /// 4. applies the inverse QFT on the estimation register.
+    /// 1. puts the estimation register into a uniform superposition,
+    /// 2. applies controlled powers of the unitary circuit (U^(2^i) controlled on estimation qubit i),
+    /// 3. applies the inverse QFT on the estimation register.
     ///
+    /// The eigenstate of `unitary` has to be prepared on `targetReg` by the caller before the
+    /// component is executed; appending a state preparation circuit to the same circuit achieves that.
     /// Measuring the estimation register then yields `phi * 2^m`, where `m` is the number of
     /// estimation qubits, up to the precision achievable with `m` qubits.
     ///
     /// The exact formula for `phi` can be found in {@link PhaseEstimation#calculateExactQPEResult(double[])}.
     ///
     /// @param estimationReg  register holding the estimated phase
-    /// @param targetReg      register holding the eigenstate `statePrep` prepares
-    /// @param statePrep      circuit preparing the eigenstate of the unitary on `targetReg`
+    /// @param targetReg      register holding the eigenstate
     /// @param unitary        circuit implementing the unitary whose phase is estimated; must act on `targetReg`'s qubits
     /// @param swap           selects the qubit order convention for the controlled unitary application and the QFT
-    /// @return circuit computing the phase estimate into `estimationReg`
+    /// @return the phase estimation component, to be appended to a circuit containing both registers
     public static QuantumCircuit quantumPhaseEstimation(QuantumRegister estimationReg,
                                                         QuantumRegister targetReg,
-                                                        QuantumCircuit statePrep,
                                                         QuantumCircuit unitary,
                                                         boolean swap) {
-        return PhaseEstimation.quantumPhaseEstimation(estimationReg, targetReg, statePrep, unitary, swap);
+        return PhaseEstimation.quantumPhaseEstimation(estimationReg, targetReg, unitary, swap);
     }
 
     /// Estimates the combined probability of measuring a good state on circuit `A`.
@@ -277,11 +274,18 @@ public final class QuantumAlgorithms {
     /// @param qc    circuit to append the state preparation to
     /// @param reg   register to prepare the state on; must have `ceil(log2(state.length))` qubits
     /// @param state amplitudes of the desired state, normalized by the method
-    public static void mottonenStateInitialization(QuantumCircuit qc, QuantumRegister reg, Complex[] state) {
+    public static void mottonenStateInitialization(QuantumCircuit qc, QuantumRegister reg, ComplexVector state) {
         MottonenStateInitialization.perform(qc, reg, state);
     }
 
-    /// Solves the MaxCut problem with QAOA, using uniform edge weights.
+    /// Solves the system of linear equations `Ax = b`.
+    ///
+    /// @apiNote WORK IN PROGRESS - DO NOT USE
+    public static QuantumCircuit HHL(ComplexMatrix A, ComplexVector b, int precision) {
+        return QuantumLinearAlgebra.HHL(A, b, precision);
+    }
+
+    /// Solves the MaxCut problem with Quantum Alternating Operator Ansatz.
     ///
     /// @param vertexCount number of graph vertices; qubit `i` represents vertex `i`
     /// @param edges       graph edges
@@ -295,7 +299,7 @@ public final class QuantumAlgorithms {
         return QAOA.maxCut(vertexCount, edges, depth, optimizer);
     }
 
-    /// Solves the number partitioning problem with QAOA.
+    /// Solves the number partitioning problem with Quantum Alternating Operator Ansatz.
     ///
     /// Given a set of positive integers, finds the partition into two disjoint sets minimizing
     /// the difference between the sets' total sums. Qubit `i` encodes which set `values[i]`

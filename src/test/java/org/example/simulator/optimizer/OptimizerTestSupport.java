@@ -72,8 +72,8 @@ final class OptimizerTestSupport {
     /// Asserts that both circuits describe the same unitary, allowing for a global phase.
     static void assertEquivalentUpToGlobalPhase(QuantumCircuit reference, QuantumCircuit candidate, String reason) {
         String context = reason.isEmpty() ? "" : reason + ": ";
-        Complex[] expected = reference.getState();
-        Complex[] actual = candidate.getState();
+        Complex[] expected = reference.getState().toArray();
+        Complex[] actual = candidate.getState().toArray();
 
         assertEquals(expected.length, actual.length, context + "state vector length");
 

@@ -3,10 +3,7 @@ package org.example.simulator;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.val;
-import org.example.math.Complex;
-import org.example.math.ComplexMatrix;
-import org.example.math.MathUtils;
-import org.example.math.Pair;
+import org.example.math.*;
 import org.example.simulator.algorithm.MottonenStateInitialization;
 import org.example.simulator.dto.CircuitAnalyticsDTO;
 import org.example.simulator.dto.CircuitStateDetailsDTO;
@@ -23,7 +20,6 @@ import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
 
 import static org.example.math.MathUtils.isBitSet;
-import static org.example.math.MathUtils.normalizeVector;
 
 /// Main class for composing quantum circuits using quantum gates.
 ///
@@ -46,10 +42,10 @@ public class QuantumCircuit {
     /// The state vector, as `2^qubitCount` amplitudes indexed by the basis state they belong to, or
     /// `null` until the circuit is run for the first time.
     ///
-    /// The getter returns the array itself, so callers can inspect the amplitudes without copying
+    /// The getter returns the vector itself, so callers can inspect the amplitudes without copying
     /// them, but can also modify the circuit's state through it.
     @Getter
-    Complex[] state;
+    ComplexVector state;
 
     /// The classical bits of this circuit, addressed by their circuit-wide index.
     ///
@@ -59,8 +55,19 @@ public class QuantumCircuit {
 
     /// The source of randomness for [#measure(int)] and [#measureOnce()].
     ///
-    /// It is not seeded, so measurements are not reproducible across runs.
+    /// It is not seeded, so measurements are not reproducible across runs unless [#setSeed(long)]
+    /// is called.
     private final Random random = new Random();
+
+    /// Reseeds the source of randomness used by [#measure(int)] and [#measureOnce()].
+    ///
+    /// Two circuits with the same state and the same seed produce the same sequence of measurement
+    /// outcomes, which makes sampling-based tests and analyses reproducible.
+    ///
+    /// @param seed the new seed
+    public void setSeed(long seed) {
+        random.setSeed(seed);
+    }
 
     /// The maximum number of qubits in a circuit, since the state vector needs `2^n` amplitudes.
     public static final int MAX_QUBITS = 20;
@@ -136,11 +143,8 @@ public class QuantumCircuit {
                 .map(QuantumTransformation::new)
                 .toList());
 
-        if (other.state != null) {
-            this.state = new Complex[1 << qubitCount];
-            for (int i = 0; i < other.state.length; i++)
-                this.state[i] = new Complex(other.state[i]);
-        }
+        if (other.state != null)
+            this.state = new ComplexVector(other.state);
 
         this.nAppliedTransformations = other.nAppliedTransformations;
         this.classicalRegisters = other.classicalRegisters.clone();
@@ -245,22 +249,30 @@ public class QuantumCircuit {
     private void applyGate(int k0, int k1, ComplexMatrix gateMatrix) {
         analyticsDTO.statevectorOperations++;
 
-        Complex c0 = state[k0];
-        Complex c1 = state[k1];
+        Complex c0 = state.get(k0);
+        Complex c1 = state.get(k1);
 
-        state[k0] = c0.multiply(gateMatrix.get(0, 0)).add(c1.multiply(gateMatrix.get(0, 1)));
-        state[k1] = c0.multiply(gateMatrix.get(1, 0)).add(c1.multiply(gateMatrix.get(1, 1)));
+        state.set(k0, c0.multiply(gateMatrix.get(0, 0)).add(c1.multiply(gateMatrix.get(0, 1))));
+        state.set(k1, c0.multiply(gateMatrix.get(1, 0)).add(c1.multiply(gateMatrix.get(1, 1))));
+    }
+
+    /// Throws unless [#run()] has already prepared the state vector.
+    ///
+    /// The accessors and printers of the state cannot do their work before the circuit is run, so
+    /// they call this instead of failing with a NullPointerException on [#state].
+    ///
+    /// @param operation the name of the calling method, used in the message
+    /// @throws IllegalStateException if this circuit has not been run yet
+    private void ensureState(String operation) {
+        if (this.state == null)
+            throw new IllegalStateException(operation + "() needs the state vector, but this circuit has not been run yet. " +
+                    "Call run() after adding the gates.");
     }
 
     /// Allocates the state vector and puts it into the `|0...0>` state.
     private void prepareIdentityState() {
-        int size = 1 << qubitCount;
-        this.state = new Complex[size];
-
-        state[0] = Complex.ONE;
-        for (int i = 1; i < size; i++) {
-            state[i] = Complex.ZERO;
-        }
+        this.state = new ComplexVector(1 << qubitCount);
+        state.set(0, Complex.ONE);
     }
 
     /// Returns the inverse of this circuit.
@@ -578,34 +590,26 @@ public class QuantumCircuit {
     /// Returns an array of probabilities of all states in the circuit.
     ///
     /// Registers passed into `regs` will be ordered right to left in the result.
+    ///
+    /// @throws IllegalStateException if this circuit has not been run yet
     public double[] getProbabilities(QuantumRegister... regs) {
+        ensureState("getProbabilities");
 
         QuantumRegister targetReg = QuantumRegister.combine(regs);
-        double[] probs = new double[1 << targetReg.size()];
-
-        for (int i = 0; i < state.length; i++) {
-            // probability of this basis state
-            double p = state[i].absSquared();
-
-            // extract target bits and build outcome index
-            int outcome = 0;
-            for (int t = 0; t < targetReg.size(); t++) {
-
-                // get target index
-                int target = qubitToIndexMap.get(targetReg.get(t));
-
-                // extract the bit corresponding to target qubit
-                int bit = (i >> target) & 1;
-
-                // perform OR with the rest of the desired bits
-                // effectively: squish the full outcome index to just the target bits
-                outcome |= (bit << t);
-            }
-
-            probs[outcome] += p;
+        int[] targetIndices = new int[targetReg.size()];
+        for (int t = 0; t < targetReg.size(); t++) {
+            targetIndices[t] = qubitToIndexMap.get(targetReg.get(t));
         }
 
-        return probs;
+        // squish the full basis state index to just the target bits
+        return state.probabilities(1 << targetReg.size(), basisState -> {
+            int outcome = 0;
+            for (int t = 0; t < targetIndices.length; t++) {
+                int bit = (basisState >> targetIndices[t]) & 1;
+                outcome |= (bit << t);
+            }
+            return outcome;
+        });
     }
 
     /// Prints the probabilities of measuring each outcome, one `outcome: probability` line per state.
@@ -627,11 +631,15 @@ public class QuantumCircuit {
     /// Prints the state vector, one `outcome: amplitude` line per basis state.
     ///
     /// Both parts of the amplitude are rounded to [#PRINT_PRECISION] decimal places.
+    ///
+    /// @throws IllegalStateException if this circuit has not been run yet
     public void printState() {
+        ensureState("printState");
+
         DecimalFormat df = new DecimalFormat("#." + "#".repeat(PRINT_PRECISION));
 
-        for (int i = 0; i < this.state.length; i++) {
-            System.out.print(i + ": " +  this.state[i].toString(df) + "\n");
+        for (int i = 0; i < this.state.getLength(); i++) {
+            System.out.print(i + ": " +  this.state.get(i).toString(df) + "\n");
         }
     }
 
@@ -652,14 +660,18 @@ public class QuantumCircuit {
     /// - `Probability` - probability of measuring this state (equal to `magnitude^2`)
     ///
     /// @param nonZeroOnly prints only states with non-zero amplitudes up to {@link QuantumCircuit#PRINT_PRECISION} decimal places.
+    ///
+    /// @throws IllegalStateException if this circuit has not been run yet
     public void printStateDetailed(boolean nonZeroOnly) {
+        ensureState("printStateDetailed");
+
         String[] columnNames = {"Outcome", "Binary", "Amplitude", "Direction", "Magnitude", "Probability"};
 
         List<CircuitStateDetailsDTO> detailsList = new ArrayList<>();
         DecimalFormat df = new DecimalFormat("#." + "#".repeat(PRINT_PRECISION));
 
-        for (int i = 0; i < this.state.length; i++) {
-            Complex c = this.state[i];
+        for (int i = 0; i < this.state.getLength(); i++) {
+            Complex c = this.state.get(i);
             CircuitStateDetailsDTO dto = new CircuitStateDetailsDTO();
 
             dto.outcome = String.valueOf(i);
@@ -725,7 +737,7 @@ public class QuantumCircuit {
 
     /// Opens a window with a bar chart of the probabilities of measuring each outcome.
     ///
-    /// There is one bar per basis state of the combined registers, labeled with the bits of that
+    /// There is one bar per basis state of the combined registers, labelled with the bits of that
     /// state in the same order as the binary strings returned by [#measure(int, QuantumRegister...)].
     ///
     /// @param regs the registers to chart, ordered right to left as described in
@@ -785,7 +797,7 @@ public class QuantumCircuit {
     ///
     /// For every state `|x>`, the applied phase shift will be `x * theta`.
     ///
-    /// @param theta the phase difference between two neighboring states
+    /// @param theta the phase difference between two neighbouring states
     /// @param targetReg the register the phases are applied to
     /// @param reverse order of qubits will be reversed
     public void geometric(double theta, QuantumRegister targetReg, boolean reverse) {
@@ -797,7 +809,10 @@ public class QuantumCircuit {
         }
     }
 
-    /// Prepares the specified state using CNOTs and RY, RZ gates. Expected to run on the identity statevector.
+
+    /// Prepares the specified state using Möttönen's Method.
+    ///
+    /// Expected to run as the first operation on the circuit (i.e. requires the statevector to be in the |0> state).
     ///
     /// Every listed basis state gets the same amplitude, so `{0, 3}` prepares an equal superposition
     /// of those two states.
@@ -807,11 +822,10 @@ public class QuantumCircuit {
     ///               `reg`, so it has to be less than `2^reg.size()`
     /// @throws ArrayIndexOutOfBoundsException if a value does not fit into `reg`
     public void initializeWithValues(QuantumRegister reg, int[] values) {
-        Complex[] state = new Complex[1 << reg.size()];
+        ComplexVector state = new ComplexVector(1 << reg.size());
 
-        Arrays.fill(state, Complex.ZERO);
         for (int v : values) {
-            state[v] = Complex.ONE;
+            state.set(v, Complex.ONE);
         }
 
         MottonenStateInitialization.perform(this, reg, state);
@@ -827,7 +841,7 @@ public class QuantumCircuit {
     /// @param reg   the register to prepare; it has to hold all qubits of the state
     /// @param state the amplitudes to prepare, in basis state order; the amplitudes do not have to be
     ///              normalized, but the array has to hold `2^reg.size()` of them
-    public void initializeWithState(QuantumRegister reg, Complex[] state) {
+    public void initializeWithState(QuantumRegister reg, ComplexVector state) {
         MottonenStateInitialization.perform(this, reg, state);
     }
 
@@ -1150,12 +1164,10 @@ public class QuantumCircuit {
 
         int mask = 1 << qIndex;
         int measuredValue = result ? mask : 0;
-        for (int i = 0; i < state.length; i++) {
-            if ((i & mask) != measuredValue)
-                state[i] = Complex.ZERO;
-        }
 
-        normalizeVector(state);
+        state.zeroOut(i -> (i & mask) != measuredValue);
+        state.normalize();
+
         return result;
     }
 }

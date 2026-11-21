@@ -1,5 +1,6 @@
 package org.example.simulator.algorithm;
 
+import org.example.math.ComplexVector;
 import org.example.simulator.QuantumCircuit;
 import org.example.simulator.register.QuantumRegister;
 import org.example.TestUtils;
@@ -8,6 +9,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class MottonenStateInitializationTest {
 
@@ -43,6 +46,17 @@ public class MottonenStateInitializationTest {
 
         qc.run();
         TestUtils.assertProbs(Map.of(3, 0.333, 6, 0.333, 7, 0.333), qc.getProbabilities());
+    }
+
+    @Test
+    void perform_stateLengthMismatch_throws() {
+        QuantumRegister reg = new QuantumRegister(2);
+        QuantumCircuit qc = new QuantumCircuit(reg);
+
+        // 3 amplitudes cannot be prepared on 2 qubits
+        ComplexVector state = new ComplexVector(3);
+
+        assertThrows(IllegalArgumentException.class, () -> qc.initializeWithState(reg, state));
     }
 
     @Test

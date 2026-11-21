@@ -79,11 +79,11 @@ public class CircuitExamples {
 
     /// Constructs a Quantum Phase Estimation circuit which estimates the phase applied by a unitary operation to the whole statevector.
     ///
-    /// Given a unitary `U` and its eigenstate prepared by `statePrep`
-    /// (i.e. applying `U` to the state created by `statePrep` only applies a global phase shift),
+    /// Given a unitary `U` and one of its eigenstates
+    /// (i.e. applying `U` to that state only applies a global phase shift),
     /// the algorithm estimates the phase `phi` in `U|psi> = e^(2*phi*pi*i)|psi>`:
     ///
-    /// 1. prepares the target register in the eigenstate using `statePrep`,
+    /// 1. prepares the target register in the eigenstate,
     /// 2. puts the estimation register into a uniform superposition,
     /// 3. applies controlled powers of the unitary circuit (U^(2^i) controlled on estimation qubit i),
     /// 4. applies the inverse QFT on the estimation register.
@@ -97,22 +97,24 @@ public class CircuitExamples {
     /// `p_a` and `p_b` denote the probabilities of `a` and`b`.
     public static QuantumCircuit quantumPhaseEstimation(int estimationQubitCount, double value) {
 
-        // create a circuit which prepares an eigenstate
-        QuantumRegister statePrepReg = new QuantumRegister(1);
-        QuantumCircuit statePrep = new QuantumCircuit(statePrepReg);
-        statePrep.x(statePrepReg.getFirst());
-        statePrep.rx(-Math.PI / 2, statePrepReg.getFirst());
+        QuantumRegister estimationReg = new QuantumRegister(estimationQubitCount);
+        QuantumRegister targetReg = new QuantumRegister(1);
 
-        // create the circuit corresponding to the eigenstate above
+        QuantumCircuit qc = new QuantumCircuit(estimationReg, targetReg);
+
+        // prepare an eigenstate of the unitary below
+        qc.x(targetReg.getFirst());
+        qc.rx(-Math.PI / 2, targetReg.getFirst());
+
+        // create the circuit corresponding to the estimated unitary
         QuantumRegister unitaryReg = new QuantumRegister(1);
         QuantumCircuit unitary = new QuantumCircuit(unitaryReg);
         unitary.ry(value * Math.TAU / 4, unitaryReg.getFirst());
 
-        QuantumRegister estimationReg = new QuantumRegister(estimationQubitCount);
-        QuantumRegister targetReg = new QuantumRegister(statePrep.getQubitCount());
-
         // estimate the eigenvalue (phase by which eigenstate is rotated)
-        return QuantumAlgorithms.quantumPhaseEstimation(estimationReg, targetReg, statePrep, unitary, false);
+        qc.append(QuantumAlgorithms.quantumPhaseEstimation(estimationReg, targetReg, unitary, false));
+
+        return qc;
     }
 
     /// Amplitude estimation gives the combined probability of measuring a good state on circuit A.

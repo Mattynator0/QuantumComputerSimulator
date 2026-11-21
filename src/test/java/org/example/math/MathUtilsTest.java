@@ -152,30 +152,6 @@ public class MathUtilsTest {
     }
 
     @Test
-    void normalizeVector() {
-        Complex[] alreadyNormalized = {Complex.ONE, Complex.ZERO, Complex.ZERO, Complex.ZERO};
-        MathUtils.normalizeVector(alreadyNormalized);
-        assertEquals(Complex.ONE, alreadyNormalized[0]);
-        assertEquals(Complex.ZERO, alreadyNormalized[1]);
-
-        Complex[] equalAmplitudes = {new Complex(1, 0), new Complex(1, 0)};
-        MathUtils.normalizeVector(equalAmplitudes);
-        assertEquals(new Complex(MathUtils.INV_SQRT2, 0), equalAmplitudes[0]);
-        assertEquals(new Complex(MathUtils.INV_SQRT2, 0), equalAmplitudes[1]);
-
-        Complex[] complexAmplitudes = {new Complex(3, 4), Complex.ZERO};
-        MathUtils.normalizeVector(complexAmplitudes);
-        assertEquals(new Complex(0.6, 0.8), complexAmplitudes[0]);
-        assertEquals(Complex.ZERO, complexAmplitudes[1]);
-    }
-
-    @Test
-    void normalizeVector_zeroVector() {
-        Complex[] zero = {Complex.ZERO, Complex.ZERO};
-        assertThrows(IllegalArgumentException.class, () -> MathUtils.normalizeVector(zero));
-    }
-
-    @Test
     void isCloseTo() {
         assertTrue(MathUtils.isCloseTo(1.0, 1.0));
         assertTrue(MathUtils.isCloseTo(1.0, 1.0 + MathUtils.EPSILON / 2));

@@ -3,6 +3,7 @@ package org.example.simulator;
 import org.example.TestUtils;
 import org.example.math.Complex;
 import org.example.math.ComplexMatrix;
+import org.example.math.ComplexVector;
 import org.example.math.MathUtils;
 import org.example.simulator.register.ClassicalRegister;
 import org.example.simulator.register.QuantumRegister;
@@ -104,7 +105,7 @@ public class QuantumCircuitTest {
         assertNotSame(original.getTransformations(), copy.getTransformations());
         assertNotSame(original.getTransformations().getFirst(), copy.getTransformations().getFirst());
         assertNotSame(original.getTransformations().get(1), copy.getTransformations().get(1));
-        assertArrayEquals(original.getState(), copy.getState());
+        assertArrayEquals(original.getState().toArray(), copy.getState().toArray());
         assertEquals(original.getClassicalRegisters(), copy.getClassicalRegisters());
         assertNotSame(original.getClassicalRegisters(), copy.getClassicalRegisters());
         assertEquals(original.nAppliedTransformations, copy.nAppliedTransformations);
@@ -116,11 +117,41 @@ public class QuantumCircuitTest {
     }
 
     @Test
+    void getProbabilities_beforeRun_throws() {
+        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+        qc.h(qc.getQubits().getFirst());
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, qc::getProbabilities);
+
+        assertTrue(ex.getMessage().contains("run()"));
+    }
+
+    @Test
+    void printState_beforeRun_throws() {
+        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, qc::printState);
+
+        assertTrue(ex.getMessage().startsWith("printState()"));
+        assertTrue(ex.getMessage().contains("run()"));
+    }
+
+    @Test
+    void measure_beforeRun_throws() {
+        QuantumCircuit qc = new QuantumCircuit(qubitCount);
+        qc.uniform();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> qc.measure(100));
+
+        assertTrue(ex.getMessage().contains("run()"));
+    }
+
+    @Test
     void run_preparesState() {
         QuantumCircuit qc = new QuantumCircuit(qubitCount);
         qc.run();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertEquals(1 << qubitCount, state.length);
         assertEquals(Complex.ONE, state[0]);
         for (int i = 1; i < state.length; i++) {
@@ -132,10 +163,10 @@ public class QuantumCircuitTest {
     void run_doesntOverwriteState() {
         QuantumCircuit qc = new QuantumCircuit(qubitCount);
         qc.nAppliedTransformations = 1;
-        qc.state = new Complex[]{Complex.ZERO};
+        qc.state = new ComplexVector(Complex.ZERO);
         qc.run();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertEquals(1, state.length);
         assertEquals(Complex.ZERO, state[0]);
     }
@@ -796,7 +827,7 @@ public class QuantumCircuitTest {
         qc.geometric(theta, qc.getQubits(), false);
         qc.run();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         for (int i = 0; i < 1 << qubitCount; i++) {
             assertCloseTo(i * theta, state[i].directionRadians());
@@ -812,7 +843,7 @@ public class QuantumCircuitTest {
         qc.geometric(theta, qc.getQubits(), true);
         qc.run();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         for (int i = 0; i < 1 << qubitCount; i++) {
             int idx = MathUtils.flipBinary(i, qubitCount);
@@ -831,7 +862,7 @@ public class QuantumCircuitTest {
         qc.geometric(theta, regA, false);
         qc.run();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         int regBStates = 1 << regB.size();
         int regAStates = 1 << regA.size();
@@ -859,8 +890,8 @@ public class QuantumCircuitTest {
         reference.run();
 
         Complex phase = new Complex(Math.cos(theta), Math.sin(theta));
-        Complex[] expected = reference.getState();
-        Complex[] actual = qc.getState();
+        Complex[] expected = reference.getState().toArray();
+        Complex[] actual = qc.getState().toArray();
 
         for (int i = 0; i < expected.length; i++) {
             Complex rotated = expected[i].multiply(phase);
@@ -912,20 +943,20 @@ public class QuantumCircuitTest {
     void initializeWithState_positiveRealNumbers() {
         QuantumCircuit qc = new QuantumCircuit(qubitCount);
 
-        Complex[] input = new Complex[1 << qubitCount];
+        ComplexVector input = new ComplexVector(1 << qubitCount);
         Random rand = new Random();
-        for (int i = 0; i < input.length; i++) {
-            input[i] = new Complex(rand.nextDouble(), 0);
+        for (int i = 0; i < input.getLength(); i++) {
+            input.set(i, new Complex(rand.nextDouble(), 0));
         }
 
         qc.initializeWithState(qc.getQubits(), input);
         qc.run();
 
-        MathUtils.normalizeVector(input);
-        Complex[] actual = qc.getState();
+        input.normalize();
+        Complex[] actual = qc.getState().toArray();
         for (int i = 0; i < actual.length; i++) {
-            assertCloseTo(input[i].re(), actual[i].re());
-            assertCloseTo(input[i].im(), actual[i].im());
+            assertCloseTo(input.get(i).re(), actual[i].re());
+            assertCloseTo(input.get(i).im(), actual[i].im());
         }
     }
 
@@ -935,10 +966,10 @@ public class QuantumCircuitTest {
     void initializeWithState_complexPhases() {
         QuantumCircuit qc = new QuantumCircuit(2);
 
-        Complex[] input = {
+        ComplexVector input = new ComplexVector(
                 new Complex(0.5, 0), new Complex(0, 0.5),
                 new Complex(-0.5, 0), new Complex(0, -0.5)
-        };
+        );
 
         qc.initializeWithState(qc.getQubits(), input);
         qc.run();
@@ -946,7 +977,7 @@ public class QuantumCircuitTest {
         assertProbs(Map.of(0, 0.25, 1, 0.25, 2, 0.25, 3, 0.25), qc.getProbabilities());
 
         double[] expectedDirections = {0, Math.PI / 2, Math.PI, -Math.PI / 2};
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         for (int i = 0; i < state.length; i++) {
             assertDirection(expectedDirections[i], state[i].directionRadians());
@@ -962,7 +993,7 @@ public class QuantumCircuitTest {
         qc.run();
 
         int length = 1 << qubitCount;
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         double angle = Math.TAU / length;
 
         for (int i = 0; i < length; i++) {
@@ -982,7 +1013,7 @@ public class QuantumCircuitTest {
         qc.run();
 
         int length = 1 << qubitCount;
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         double angle = Math.TAU / length;
 
         for (int i = 0; i < length; i++) {
@@ -1000,7 +1031,7 @@ public class QuantumCircuitTest {
         qc.run();
 
         int length = 1 << qubitCount;
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         double angle = Math.TAU / length * MathUtils.flipBinary(1, qubitCount);
 
         for (int i = 0; i < length; i++) {
@@ -1018,7 +1049,7 @@ public class QuantumCircuitTest {
         qc.run();
 
         int length = 1 << qubitCount;
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         double angle = Math.TAU / length * MathUtils.flipBinary(1, qubitCount);
 
         for (int i = 0; i < length; i++) {
@@ -1041,7 +1072,7 @@ public class QuantumCircuitTest {
         qc.iqft(reg, false, false);
         qc.run();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertProbs(Map.of(4, 1.), qc.getProbabilities());
         assertDirection(0, state[4].directionRadians());
     }
@@ -1058,7 +1089,7 @@ public class QuantumCircuitTest {
         qc.iqft(reg, false, true);
         qc.run();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertProbs(Map.of(1, 1.), qc.getProbabilities());
         assertDirection(0, state[1].directionRadians());
     }
@@ -1075,7 +1106,7 @@ public class QuantumCircuitTest {
         qc.iqft(reg, true, false);
         qc.run();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertProbs(Map.of(1, 1.), qc.getProbabilities());
         assertDirection(0, state[1].directionRadians());
     }
@@ -1092,7 +1123,7 @@ public class QuantumCircuitTest {
         qc.iqft(reg, true, true);
         qc.run();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertProbs(Map.of(4, 1.), qc.getProbabilities());
         assertDirection(0, state[4].directionRadians());
     }
@@ -1108,7 +1139,7 @@ public class QuantumCircuitTest {
 
         assertProbs(Map.of(1, 1.), probs);
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertDirection(0, state[1].directionRadians());
     }
 
@@ -1123,7 +1154,7 @@ public class QuantumCircuitTest {
 
         assertProbs(Map.of(7, 1.), probs);
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertDirection(0, state[7].directionRadians());
     }
 
@@ -1139,7 +1170,7 @@ public class QuantumCircuitTest {
 
         assertProbs(Map.of(5, 1.), probs);
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertDirection(0, state[5].directionRadians());
     }
 
@@ -1155,7 +1186,7 @@ public class QuantumCircuitTest {
         double[] probs = qc.getProbabilities();
         assertProbs(Map.of(0, 0.5, 1, 0.5), probs);
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertDirection(-Math.PI / 2, state[0].directionRadians());
         assertDirection(Math.PI / 2, state[1].directionRadians());
     }
@@ -1171,7 +1202,7 @@ public class QuantumCircuitTest {
         double[] probs = qc.getProbabilities();
         assertProbs(Map.of(7, 1.), probs);
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertDirection(-Math.PI / 2, state[7].directionRadians());
     }
 
@@ -1187,7 +1218,7 @@ public class QuantumCircuitTest {
         double[] probs = qc.getProbabilities();
         assertProbs(Map.of(5, 1.), probs);
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertDirection(Math.PI, state[5].directionRadians());
     }
 
@@ -1203,7 +1234,7 @@ public class QuantumCircuitTest {
         double[] probs = qc.getProbabilities();
         assertProbs(Map.of(0, 0.5, 1, 0.5), probs);
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertDirection(0, state[0].directionRadians());
         assertDirection(Math.PI, state[1].directionRadians());
     }
@@ -1218,7 +1249,7 @@ public class QuantumCircuitTest {
         qc.run();
         double[] probs = qc.getProbabilities();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertProbs(Map.of(7, 1.), probs);
         assertDirection(Math.PI, state[7].directionRadians());
     }
@@ -1234,7 +1265,7 @@ public class QuantumCircuitTest {
         qc.run();
         double[] probs = qc.getProbabilities();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertProbs(Map.of(5, 1.), probs);
         assertDirection(0, state[5].directionRadians());
     }
@@ -1250,7 +1281,7 @@ public class QuantumCircuitTest {
         double[] probs = qc.getProbabilities();
         assertProbs(Map.of(0, 0.5, 1, 0.5), probs);
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertDirection(0, state[0].directionRadians());
         assertDirection(0, state[1].directionRadians());
     }
@@ -1267,7 +1298,7 @@ public class QuantumCircuitTest {
         double[] probs = qc.getProbabilities();
         assertProbs(Map.of(0, 0.5, 1, 0.5), probs);
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertDirection(0, state[0].directionRadians());
         assertDirection(Math.PI, state[1].directionRadians());
     }
@@ -1280,7 +1311,7 @@ public class QuantumCircuitTest {
 
         qc.run();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         for (Complex c : state) {
             assertCloseTo(0.125, c.absSquared());
             assertDirection(0, c.directionRadians());
@@ -1301,7 +1332,7 @@ public class QuantumCircuitTest {
         double[] probs = qc.getProbabilities();
         assertProbs(Map.of(0, 0.5, 1, 0.5), probs);
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertDirection(0, state[0].directionRadians());
         assertDirection(theta, state[1].directionRadians());
     }
@@ -1318,7 +1349,7 @@ public class QuantumCircuitTest {
         qc.run();
         double[] probs = qc.getProbabilities();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertProbs(Map.of(7, 1.), probs);
         assertDirection(3 * theta, state[7].directionRadians());
     }
@@ -1332,7 +1363,7 @@ public class QuantumCircuitTest {
         qc.rx(theta, reg.get(0));
 
         qc.run();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         ComplexMatrix expected = Gate.RX(theta).getMatrix();
         assertEquals(expected.get(0, 0), state[0]);
@@ -1349,7 +1380,7 @@ public class QuantumCircuitTest {
         qc.rx(theta, reg.get(0));
 
         qc.run();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         ComplexMatrix expected = Gate.RX(theta).getMatrix();
         assertEquals(expected.get(0, 1), state[0]);
@@ -1381,7 +1412,7 @@ public class QuantumCircuitTest {
         qc.ry(theta, reg.get(0));
 
         qc.run();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         ComplexMatrix expected = Gate.RY(theta).getMatrix();
         assertEquals(expected.get(0, 0), state[0]);
@@ -1398,7 +1429,7 @@ public class QuantumCircuitTest {
         qc.ry(theta, reg.get(0));
 
         qc.run();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         ComplexMatrix expected = Gate.RY(theta).getMatrix();
         assertEquals(expected.get(0, 1), state[0]);
@@ -1430,7 +1461,7 @@ public class QuantumCircuitTest {
         qc.rz(theta, reg.get(0));
 
         qc.run();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         ComplexMatrix expected = Gate.RZ(theta).getMatrix();
         assertEquals(expected.get(0, 0), state[0]);
@@ -1447,7 +1478,7 @@ public class QuantumCircuitTest {
         qc.rz(theta, reg.get(0));
 
         qc.run();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         ComplexMatrix expected = Gate.RZ(theta).getMatrix();
         assertEquals(expected.get(0, 1), state[0]);
@@ -1480,7 +1511,7 @@ public class QuantumCircuitTest {
         qc.swap(reg.get(0), reg.get(2));
 
         qc.run();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         ComplexMatrix expected = Gate.RX(theta).getMatrix();
         assertEquals(expected.get(0, 0), state[0]);
@@ -1499,7 +1530,7 @@ public class QuantumCircuitTest {
 
         assertProbs(Map.of(0, 0.5, 3, 0.5), qc.getProbabilities());
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertDirection(0, state[3].directionRadians());
     }
 
@@ -1514,7 +1545,7 @@ public class QuantumCircuitTest {
 
         assertProbs(Map.of(0, 0.5, 3, 0.5), qc.getProbabilities());
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertDirection(0, state[0].directionRadians());
         assertDirection(Math.PI / 2, state[3].directionRadians());
     }
@@ -1530,7 +1561,7 @@ public class QuantumCircuitTest {
         qc.run();
 
         double[] probs = qc.getProbabilities();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         for (int i = 0; i < 3; i++) {
             assertCloseTo(0.25, probs[i]);
@@ -1553,7 +1584,7 @@ public class QuantumCircuitTest {
         // the control in |+> and the target in |1> give |01>, |10> and |11>; a CX would only produce
         // |01> and |10>, because it would flip the target instead of applying H to it
         assertProbs(Map.of(1, 0.25, 2, 0.5, 3, 0.25), qc.getProbabilities());
-        assertDirection(Math.PI, qc.getState()[3].directionRadians());
+        assertDirection(Math.PI, qc.getState().get(3).directionRadians());
     }
 
     @Test
@@ -1580,7 +1611,7 @@ public class QuantumCircuitTest {
         qc.run();
 
         double[] probs = qc.getProbabilities();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         for (int i = 0; i < 3; i++) {
             assertCloseTo(0.25, probs[i]);
@@ -1601,7 +1632,7 @@ public class QuantumCircuitTest {
         qc.run();
 
         double[] probs = qc.getProbabilities();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         for (int i = 0; i < 3; i++) {
             assertCloseTo(0.25, probs[i]);
@@ -1623,7 +1654,7 @@ public class QuantumCircuitTest {
         qc.run();
 
         double[] probs = qc.getProbabilities();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         for (int i = 0; i < 7; i++) {
             assertCloseTo(0.125, probs[i]);
@@ -1646,7 +1677,7 @@ public class QuantumCircuitTest {
         qc.run();
 
         double[] probs = qc.getProbabilities();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         for (int i = 0; i < 7; i++) {
             assertCloseTo(0.125, probs[i]);
@@ -1757,7 +1788,7 @@ public class QuantumCircuitTest {
         qc.ccp(theta, classical.get(0), qubits.get(1));
         qc.run();
 
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
         assertProbs(Map.of(1, 0.5, 3, 0.5), qc.getProbabilities());
         assertDirection(0, state[1].directionRadians());
         assertDirection(theta, state[3].directionRadians());
@@ -1770,7 +1801,7 @@ public class QuantumCircuitTest {
         zeroCircuit.run();
 
         assertEquals(1, zeroCircuit.getTransformations().size());
-        assertDirection(0, zeroCircuit.getState()[2].directionRadians());
+        assertDirection(0, zeroCircuit.getState().get(2).directionRadians());
     }
 
     @Test

@@ -1,6 +1,7 @@
 package org.example.simulator;
 
 import org.example.math.Complex;
+import org.example.math.ComplexVector;
 import org.example.math.Edge;
 import org.example.simulator.algorithm.PhaseEstimation;
 import org.example.simulator.algorithm.qaoa.optimizer.GradientDescentOptimizer;
@@ -48,7 +49,7 @@ public class QuantumAlgorithmsTest {
         qc.append(QuantumAlgorithms.phaseOracle(reg, items));
 
         qc.run();
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
         int itemsIndex = 0;
         for (int i = 0; i < N; i++) {
@@ -141,16 +142,18 @@ public class QuantumAlgorithmsTest {
 
         double theta = x * Math.TAU / (1 << estimationQubits - 1);
 
-        QuantumCircuit statePrep = new QuantumCircuit(targetQubits);
-        statePrep.x(statePrep.getQubits().getFirst());
-
         QuantumCircuit unitary = new QuantumCircuit(targetQubits);
         unitary.rz(theta, unitary.getQubits().getFirst());
 
         QuantumRegister estimationReg = new QuantumRegister(estimationQubits);
         QuantumRegister targetReg = new QuantumRegister(targetQubits);
 
-        QuantumCircuit qc = QuantumAlgorithms.quantumPhaseEstimation(estimationReg, targetReg, statePrep, unitary, false);
+        QuantumCircuit qc = new QuantumCircuit(estimationReg, targetReg);
+
+        // prepare an eigenstate of the unitary above
+        qc.x(targetReg.getFirst());
+
+        qc.append(QuantumAlgorithms.quantumPhaseEstimation(estimationReg, targetReg, unitary, false));
         qc.run();
 
         double[] probs = qc.getProbabilities(estimationReg);
@@ -166,16 +169,18 @@ public class QuantumAlgorithmsTest {
         double x = 4.2;
         double theta = x * Math.TAU / (1 << estimationQubits - 1);
 
-        QuantumCircuit statePrep = new QuantumCircuit(targetQubits);
-        statePrep.x(statePrep.getQubits().getFirst());
-
         QuantumCircuit unitary = new QuantumCircuit(targetQubits);
         unitary.rz(theta, unitary.getQubits().getFirst());
 
         QuantumRegister estimationReg = new QuantumRegister(estimationQubits);
         QuantumRegister targetReg = new QuantumRegister(targetQubits);
 
-        QuantumCircuit qc = QuantumAlgorithms.quantumPhaseEstimation(estimationReg, targetReg, statePrep, unitary, false);
+        QuantumCircuit qc = new QuantumCircuit(estimationReg, targetReg);
+
+        // prepare an eigenstate of the unitary above
+        qc.x(targetReg.getFirst());
+
+        qc.append(QuantumAlgorithms.quantumPhaseEstimation(estimationReg, targetReg, unitary, false));
         qc.run();
 
         double[] probs = qc.getProbabilities(estimationReg);
@@ -257,19 +262,19 @@ public class QuantumAlgorithmsTest {
         QuantumRegister reg = new QuantumRegister(2);
         QuantumCircuit qc = new QuantumCircuit(reg);
 
-        Complex[] desired = new Complex[]{
+        ComplexVector desired = new ComplexVector(
                 new Complex(1, 0), new Complex(2, 0),
-                new Complex(3, 0), new Complex(4, 0),
-        };
+                new Complex(3, 0), new Complex(4, 0)
+        );
 
         QuantumAlgorithms.mottonenStateInitialization(qc, reg, desired);
         qc.run();
 
         double norm = Math.sqrt(1 + 4 + 9 + 16);
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
-        for (int i = 0; i < desired.length; i++) {
-            assertCloseTo(desired[i].abs() / norm, state[i].abs());
+        for (int i = 0; i < desired.getLength(); i++) {
+            assertCloseTo(desired.get(i).abs() / norm, state[i].abs());
             assertDirection(0, state[i].directionRadians());
         }
     }
@@ -279,19 +284,19 @@ public class QuantumAlgorithmsTest {
         QuantumRegister reg = new QuantumRegister(2);
         QuantumCircuit qc = new QuantumCircuit(reg);
 
-        Complex[] desired = new Complex[]{
+        ComplexVector desired = new ComplexVector(
                 new Complex(-1, 0), new Complex(2, 0),
-                new Complex(-3, 0), new Complex(4, 0),
-        };
+                new Complex(-3, 0), new Complex(4, 0)
+        );
 
         QuantumAlgorithms.mottonenStateInitialization(qc, reg, desired);
         qc.run();
 
         Complex norm = new Complex(Math.sqrt(1 + 4 + 9 + 16));
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
-        for (int i = 0; i < desired.length; i++) {
-            assertEquals(desired[i].divide(norm), state[i]);
+        for (int i = 0; i < desired.getLength(); i++) {
+            assertEquals(desired.get(i).divide(norm), state[i]);
         }
     }
 
@@ -300,19 +305,19 @@ public class QuantumAlgorithmsTest {
         QuantumRegister reg = new QuantumRegister(2);
         QuantumCircuit qc = new QuantumCircuit(reg);
 
-        Complex[] desired = new Complex[]{
+        ComplexVector desired = new ComplexVector(
                 new Complex(-1, 1), new Complex(2, 2),
-                new Complex(-3, -5), new Complex(4, 0),
-        };
+                new Complex(-3, -5), new Complex(4, 0)
+        );
 
         QuantumAlgorithms.mottonenStateInitialization(qc, reg, desired);
         qc.run();
 
         Complex norm = new Complex(Math.sqrt(2 + 8 + 34 + 16));
-        Complex[] state = qc.getState();
+        Complex[] state = qc.getState().toArray();
 
-        for (int i = 0; i < desired.length; i++) {
-            assertEquals(desired[i].divide(norm), state[i]);
+        for (int i = 0; i < desired.getLength(); i++) {
+            assertEquals(desired.get(i).divide(norm), state[i]);
         }
     }
 

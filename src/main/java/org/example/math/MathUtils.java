@@ -186,31 +186,6 @@ public class MathUtils {
         return result;
     }
 
-    /// Scales {@code state} in place so that the Euclidean norm of the amplitudes is {@code 1}.
-    ///
-    /// @param state amplitudes to normalize; mutated in place
-    /// @throws IllegalArgumentException if every amplitude is zero
-    public static void normalizeVector(Complex[] state) {
-
-        double normSquared = 0.0;
-
-        // 1. compute sum of |a_i|^2
-        for (Complex c : state) {
-            normSquared += c.absSquared();
-        }
-
-        if (normSquared == 0.0) {
-            throw new IllegalArgumentException("Cannot normalize a zero vector.");
-        }
-
-        double norm = Math.sqrt(normSquared);
-
-        // 2. divide each amplitude by norm
-        for (int i = 0; i < state.length; i++) {
-            state[i] = state[i].divide(new Complex(norm, 0));
-        }
-    }
-
     /// Returns whether {@code a} and {@code b} differ by at most {@link #EPSILON}.
     ///
     /// @param a first value

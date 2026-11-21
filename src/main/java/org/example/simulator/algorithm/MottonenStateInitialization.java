@@ -1,14 +1,12 @@
 package org.example.simulator.algorithm;
 
-import org.example.math.Complex;
+import org.example.math.ComplexVector;
 import org.example.math.MathUtils;
 import org.example.simulator.QuantumCircuit;
 import org.example.simulator.register.QuantumRegister;
 
 import java.util.Arrays;
 import java.util.stream.IntStream;
-
-import static org.example.math.MathUtils.normalizeVector;
 
 public class MottonenStateInitialization {
 
@@ -17,18 +15,31 @@ public class MottonenStateInitialization {
     // which itself is based on:
     // Möttönen et al. (2004) <https://arxiv.org/abs/quant-ph/0407010>
 
-    /// Performs Möttönen's state initialization
-    public static void perform(QuantumCircuit qc, QuantumRegister reg, Complex[] inputState) {
-        int n = MathUtils.ceilLog2(inputState.length);
+    /// Performs Möttönen's state initialization.
+    ///
+    /// The input state is normalized before use and is not modified.
+    ///
+    /// @param qc         the circuit the state is prepared on
+    /// @param reg        the register the state is prepared in; it has to hold all qubits of the state
+    /// @param inputState the amplitudes to prepare, in basis state order; it has to hold `2^reg.size()`
+    ///                   of them, but they do not have to be normalized
+    /// @throws IllegalArgumentException if `inputState` does not hold `2^reg.size()` amplitudes
+    public static void perform(QuantumCircuit qc, QuantumRegister reg, ComplexVector inputState) {
 
-        if (reg.size() != n)
-            throw new IllegalArgumentException("Register size doesn't match input state size.");
+        int n = reg.size();
 
-        Complex[] normalizedState = Arrays.stream(inputState).map(Complex::new).toArray(Complex[]::new);
-        normalizeVector(normalizedState);
+        if (inputState.getLength() != 1 << n)
+            throw new IllegalArgumentException("Register size doesn't match input state size.\n" +
+                    "register's qubits = " + n +
+                    ", input state's amplitudes = " + inputState.getLength());
 
-        double[] magnitudes = new double[normalizedState.length];
-        for (int i = 0; i < normalizedState.length; i++) magnitudes[i] = normalizedState[i].absSquared();
+        ComplexVector normalizedState = new ComplexVector(inputState);
+        normalizedState.normalize();
+
+        int length = normalizedState.getLength();
+
+        double[] magnitudes = new double[length];
+        for (int i = 0; i < length; i++) magnitudes[i] = normalizedState.get(i).absSquared();
 
         // RY rotations and CNOTs to rotate into correct amplitudes
         for (int k = n; k > 0; k--) {
@@ -38,8 +49,8 @@ public class MottonenStateInitialization {
             mottonenApplyUniformRotation(qc, reg, 'y', alphaYK, controls, target);
         }
 
-        double[] omegas = new double[normalizedState.length];
-        for (int i = 0; i < normalizedState.length; i++) omegas[i] = normalizedState[i].directionRadians();
+        double[] omegas = new double[length];
+        for (int i = 0; i < length; i++) omegas[i] = normalizedState.get(i).directionRadians();
 
         // RZ rotations and CNOTs to rotate into correct relative phases
         for (int k = n; k > 0; k--) {

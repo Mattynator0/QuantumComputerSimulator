@@ -6,32 +6,41 @@ import org.example.simulator.register.QuantumRegister;
 
 public class PhaseEstimation {
 
+    /// Builds the Quantum Phase Estimation component.
+    ///
+    /// The returned circuit acts on the qubits of `estimationReg` and `targetReg`, so it can be
+    /// appended to any circuit containing those registers without remapping. It contains only the
+    /// estimation part of the algorithm: the Hadamards, the controlled powers of `unitary` and the
+    /// inverse QFT. The eigenstate of `unitary` has to be prepared on `targetReg` by the caller,
+    /// before the component is executed.
+    ///
+    /// @param estimationReg register holding the estimated phase
+    /// @param targetReg     register holding the eigenstate
+    /// @param unitary       circuit implementing the unitary whose phase is estimated; must act on `targetReg`'s qubits
+    /// @param swap          selects the qubit order convention for the controlled unitary application and the QFT
+    /// @return the phase estimation component, to be appended to a circuit containing both registers
     public static QuantumCircuit quantumPhaseEstimation(QuantumRegister estimationReg,
                                                         QuantumRegister targetReg,
-                                                        QuantumCircuit statePrep,
                                                         QuantumCircuit unitary,
                                                         boolean swap) {
+        QuantumCircuit qpe = new QuantumCircuit(estimationReg, targetReg);
 
-        QuantumCircuit qc = new QuantumCircuit(estimationReg, targetReg);
+        // 1. Hadamards on estimation register
+        qpe.h(estimationReg);
 
-        // 1. Prepare target register
-        qc.append(statePrep, targetReg);
-
-        // 2. Hadamards on estimation register
-        qc.h(estimationReg);
-
-        // 3. Controlled powers of the unitary operator
+        // 2. Controlled powers of the unitary operator
         for (int i = 0; i < estimationReg.size(); i++) {
             for (int j = 0; j < (1 << i); j++) {
 
                 int controlIndex = swap ? i : estimationReg.size() - i - 1;
-                qc.cAppend(estimationReg.get(controlIndex), unitary, targetReg);
+                qpe.cAppend(estimationReg.get(controlIndex), unitary, targetReg);
             }
         }
 
-        // 4. IQFT
-        qc.iqft(estimationReg, !swap, swap);
-        return qc;
+        // 3. IQFT
+        qpe.iqft(estimationReg, !swap, swap);
+
+        return qpe;
     }
 
     public static double calculateExactQPEResult(double[] probs) {
@@ -74,6 +83,10 @@ public class PhaseEstimation {
 
         QuantumCircuit groverCircuit = QuantumAlgorithms.grover(statePrep, phaseOracle, 1);
 
-        return quantumPhaseEstimation(estimationReg, targetReg, statePrep, groverCircuit, swap);
+        QuantumCircuit qc = new QuantumCircuit(estimationReg, targetReg);
+        qc.append(statePrep, targetReg);
+        qc.append(quantumPhaseEstimation(estimationReg, targetReg, groverCircuit, swap));
+
+        return qc;
     }
 }

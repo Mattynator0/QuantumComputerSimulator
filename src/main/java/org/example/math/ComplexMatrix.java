@@ -1,11 +1,18 @@
 package org.example.math;
 
+import lombok.Getter;
+
 import java.util.Arrays;
+import java.util.Objects;
 
 public final class ComplexMatrix {
 
+    @Getter
     private final int rows;
+
+    @Getter
     private final int cols;
+
     final Complex[][] data;
 
     public ComplexMatrix(Complex[][] data) {
@@ -37,5 +44,16 @@ public final class ComplexMatrix {
             System.arraycopy(src[i], 0, dst[i], 0, src[i].length);
         }
         return dst;
+    }
+
+    public boolean isHermitian() {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                if (!Objects.equals(data[i][j], data[j][i].conjugate())) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 }
